@@ -1,6 +1,6 @@
 export const DOWNLOAD_CONFIG = {
-  version: '0.1.13',
-  releaseDate: '2025-12-03',
+  version: '0.1.14',
+  releaseDate: '2025-12-05',
 
   github: {
     repo: 'https://github.com/talkcody/talkcody',
@@ -10,9 +10,9 @@ export const DOWNLOAD_CONFIG = {
   },
 
   downloads: {
-    'darwin-aarch64': 'https://cdn.talkcody.com/releases/v0.1.13/TalkCody_0.1.13_aarch64.dmg',
-    'darwin-x86_64': 'https://cdn.talkcody.com/releases/v0.1.13/TalkCody_0.1.13_x64.dmg',
-    'windows-x86_64': 'https://cdn.talkcody.com/releases/v0.1.13/TalkCody_0.1.13_x64_en-US.msi',
-    'linux-x86_64': 'https://cdn.talkcody.com/releases/v0.1.13/TalkCody_0.1.13_amd64.AppImage',
+    'darwin-aarch64': 'https://cdn.talkcody.com/releases/v0.1.14/TalkCody_0.1.14_aarch64.dmg',
+    'darwin-x86_64': 'https://cdn.talkcody.com/releases/v0.1.14/TalkCody_0.1.14_x64.dmg',
+    'windows-x86_64': 'https://cdn.talkcody.com/releases/v0.1.14/TalkCody_0.1.14_x64_en-US.msi',
+    'linux-x86_64': 'https://cdn.talkcody.com/releases/v0.1.14/TalkCody_0.1.14_amd64.AppImage',
   },
 };
