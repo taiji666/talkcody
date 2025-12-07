@@ -87,7 +87,10 @@ jobs:
           timeout_minutes: 30
           max_attempts: 3
           retry_wait_seconds: 60
-          command: bun run tauri build
+          command: |
+            jq '.bundle.createUpdaterArtifacts = true' src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
+            mv /tmp/tauri.conf.json.tmp src-tauri/tauri.conf.json
+            bun run tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -139,8 +142,15 @@ jobs:
       - name: Build frontend
         run: bun run build
 
+      - name: Install jq
+        run: choco install jq -y
+
       - name: Build Tauri app
-        run: bun run tauri build
+        run: |
+          jq '.bundle.createUpdaterArtifacts = true' src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
+          mv /tmp/tauri.conf.json.tmp src-tauri/tauri.conf.json
+          bun run tauri build
+        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -152,9 +162,6 @@ jobs:
 
       - name: Install wrangler
         run: npm install -g wrangler
-
-      - name: Install jq
-        run: choco install jq -y
 
       - name: Run release script (Windows)
         run: |

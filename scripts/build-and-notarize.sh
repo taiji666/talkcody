@@ -73,7 +73,19 @@ echo ""
 
 # Step 2: Build current architecture version
 echo "Step 2/4: Building ${ARCH_NAME} version..."
+
+# Temporarily enable createUpdaterArtifacts for release build
+echo "  Enabling createUpdaterArtifacts for release build..."
+jq '.bundle.createUpdaterArtifacts = true' src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
+mv /tmp/tauri.conf.json.tmp src-tauri/tauri.conf.json
+
 bun run tauri build
+
+# Restore createUpdaterArtifacts to false
+echo "  Restoring createUpdaterArtifacts to false..."
+jq '.bundle.createUpdaterArtifacts = false' src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
+mv /tmp/tauri.conf.json.tmp src-tauri/tauri.conf.json
+
 echo -e "${GREEN}OK${NC} ${ARCH_NAME} version build complete"
 echo ""
 
