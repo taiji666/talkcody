@@ -88,12 +88,29 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 60
           command: |
+            # Verify signing key is set
+            if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+              echo "ERROR: TAURI_SIGNING_PRIVATE_KEY is not set!"
+              exit 1
+            fi
+            echo "TAURI_SIGNING_PRIVATE_KEY is set (length: ${#TAURI_SIGNING_PRIVATE_KEY})"
+
+            # Enable createUpdaterArtifacts
             jq '.bundle.createUpdaterArtifacts = true' src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
             mv /tmp/tauri.conf.json.tmp src-tauri/tauri.conf.json
+
+            # Verify the change
+            echo "Verifying createUpdaterArtifacts setting:"
+            jq '.bundle.createUpdaterArtifacts' src-tauri/tauri.conf.json
+
+            # Build
             bun run tauri build
+
+            # List generated files for debugging
+            echo "Generated files in appimage directory:"
+            ls -la src-tauri/target/release/bundle/appimage/ || echo "Directory not found"
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Setup Node.js for wrangler
         uses: actions/setup-node@v4
@@ -108,8 +125,6 @@ jobs:
           chmod +x .github/scripts/release.sh
           PLATFORM=linux ARCH=x86_64 ./.github/scripts/release.sh
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           VERSION: ${{ needs.create-release.outputs.version }}
@@ -147,13 +162,30 @@ jobs:
 
       - name: Build Tauri app
         run: |
+          # Verify signing key is set
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "ERROR: TAURI_SIGNING_PRIVATE_KEY is not set!"
+            exit 1
+          fi
+          echo "TAURI_SIGNING_PRIVATE_KEY is set (length: ${#TAURI_SIGNING_PRIVATE_KEY})"
+
+          # Enable createUpdaterArtifacts
           jq '.bundle.createUpdaterArtifacts = true' src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
           mv /tmp/tauri.conf.json.tmp src-tauri/tauri.conf.json
+
+          # Verify the change
+          echo "Verifying createUpdaterArtifacts setting:"
+          jq '.bundle.createUpdaterArtifacts' src-tauri/tauri.conf.json
+
+          # Build
           bun run tauri build
+
+          # List generated files for debugging
+          echo "Generated files in msi directory:"
+          ls -la src-tauri/target/release/bundle/msi/ || echo "Directory not found"
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Setup Node.js for wrangler
         uses: actions/setup-node@v4
@@ -168,17 +200,13 @@ jobs:
           $env:PLATFORM = "windows"
           $env:ARCH = "x86_64"
           $env:VERSION = "${{ needs.create-release.outputs.version }}"
-          $env:TAURI_SIGNING_PRIVATE_KEY = "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
-          $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}"
           $env:CLOUDFLARE_API_TOKEN = "${{ secrets.CLOUDFLARE_API_TOKEN }}"
           $env:CLOUDFLARE_ACCOUNT_ID = "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
-          
+
           # Convert Windows path to Unix path for bash
           bash .github/scripts/release.sh
         shell: pwsh
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
