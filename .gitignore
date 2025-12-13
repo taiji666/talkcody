@@ -81,6 +81,7 @@ scripts/*
 # Design documents (ignore most, keep specific files)
 design/*
 !design/multi-agent-parallel-execution.md
+!design/core-concepts.md
 .wrangler/
 
 # Turso database files (local mode)
