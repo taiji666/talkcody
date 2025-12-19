@@ -10,7 +10,10 @@ import { secureStorage } from '@/services/secure-storage';
  * Create authenticated fetch function for TalkCody provider
  * Uses JWT token from user authentication
  */
-function createAuthenticatedFetch(): typeof fetch {
+function createAuthenticatedFetch(): (
+  input: RequestInfo | URL,
+  init?: RequestInit
+) => Promise<Response> {
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     // Get JWT token from secure storage
     const token = await secureStorage.getAuthToken();
