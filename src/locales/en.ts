@@ -328,6 +328,14 @@ const en: LocaleDefinition = {
       selectLanguage: 'Select Language',
       autoDetect: 'Auto-detect from browser',
     },
+    terminalFont: {
+      title: 'Terminal Font',
+      description: 'Configure the font family and size used in the terminal',
+      fontFamily: 'Font Family',
+      fontSize: 'Font Size',
+      placeholder:
+        'Menlo, Monaco, "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Droid Sans Mono", "Courier New", monospace',
+    },
     theme: {
       title: 'Theme',
       description: 'Choose your preferred appearance theme',

@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import { logger } from '@/lib/logger';
 import { terminalService } from '@/services/terminal-service';
+import { useSettingsStore } from '@/stores/settings-store';
 import { useTerminalStore } from '@/stores/terminal-store';
 
 // Terminal themes
@@ -64,6 +65,10 @@ export function Terminal({ sessionId }: TerminalProps) {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const isAttachedRef = useRef(false);
 
+  // Get font settings from store
+  const terminalFont = useSettingsStore((state) => state.terminal_font);
+  const terminalFontSize = useSettingsStore((state) => state.terminal_font_size);
+
   useEffect(() => {
     if (!terminalRef.current) {
       return;
@@ -94,8 +99,9 @@ export function Terminal({ sessionId }: TerminalProps) {
     const xterm = new XTerm({
       cursorBlink: true,
       cursorStyle: 'block',
-      fontSize: 13,
+      fontSize: terminalFontSize || 14,
       fontFamily:
+        terminalFont ||
         'Menlo, Monaco, "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Droid Sans Mono", "Courier New", monospace',
       theme,
       allowTransparency: false,
@@ -159,7 +165,7 @@ export function Terminal({ sessionId }: TerminalProps) {
       xterm.dispose();
       isAttachedRef.current = false;
     };
-  }, [sessionId]); // Only depend on sessionId, not session object
+  }, [sessionId, terminalFont, terminalFontSize]); // Add font settings as dependencies
 
   // Check if session exists for rendering
   const session = useTerminalStore((state) => state.sessions.get(sessionId));

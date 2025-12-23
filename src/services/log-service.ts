@@ -3,7 +3,7 @@ import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '@/lib/logger';
 
 export class LogService {
-  private logFileName = 'talkcody.log';
+  private logFileName = 'TalkCody.log';
 
   /**
    * Get platform-specific log directory path
@@ -17,8 +17,8 @@ export class LogService {
         return join(home, 'Library', 'Logs', 'com.talkcody');
       case 'windows': {
         // Windows
-        const appData = await appDataDir();
-        return join(appData, 'logs');
+        // const appData = await appDataDir();
+        return join(home, 'AppData', 'Local', 'com.talkcody', 'logs');
       }
       default: // Linux and others
         return join(home, '.local', 'share', 'com.talkcody', 'logs');

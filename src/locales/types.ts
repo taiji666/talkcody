@@ -318,6 +318,13 @@ export interface LocaleDefinition {
       selectLanguage: string;
       autoDetect: string;
     };
+    terminalFont: {
+      title: string;
+      description: string;
+      fontFamily: string;
+      fontSize: string;
+      placeholder: string;
+    };
     theme: {
       title: string;
       description: string;

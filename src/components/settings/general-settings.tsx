@@ -59,8 +59,16 @@ export function GeneralSettings() {
   const [defaultWorktreeRoot, setDefaultWorktreeRoot] = useState<string>('');
   const terminalShell = useSettingsStore((state) => state.terminal_shell);
   const setTerminalShell = useSettingsStore((state) => state.setTerminalShell);
+  const terminalFont = useSettingsStore((state) => state.terminal_font);
+  const setTerminalFont = useSettingsStore((state) => state.setTerminalFont);
+  const terminalFontSize = useSettingsStore((state) => state.terminal_font_size);
+  const setTerminalFontSize = useSettingsStore((state) => state.setTerminalFontSize);
   const worktreeRootPath = useSettingsStore((state) => state.worktree_root_path);
   const setWorktreeRootPath = useSettingsStore((state) => state.setWorktreeRootPath);
+
+  // Local state for font input to avoid frequent store updates
+  const [localTerminalFont, setLocalTerminalFont] = useState(terminalFont);
+  const [localTerminalFontSize, setLocalTerminalFontSize] = useState(terminalFontSize);
 
   useEffect(() => {
     // Detect Windows platform
@@ -81,6 +89,15 @@ export function GeneralSettings() {
       .then(setDefaultWorktreeRoot)
       .catch(console.error);
   }, []);
+
+  // Sync local state with store state
+  useEffect(() => {
+    setLocalTerminalFont(terminalFont);
+  }, [terminalFont]);
+
+  useEffect(() => {
+    setLocalTerminalFontSize(terminalFontSize);
+  }, [terminalFontSize]);
 
   const handleLanguageChange = async (value: SupportedLocale) => {
     await setLocale(value);
@@ -103,6 +120,19 @@ export function GeneralSettings() {
 
   const handleResetWorktreeRoot = async () => {
     await setWorktreeRootPath('');
+  };
+
+  // Handle font input blur to commit changes
+  const handleFontBlur = () => {
+    if (localTerminalFont !== terminalFont) {
+      setTerminalFont(localTerminalFont);
+    }
+  };
+
+  const handleFontSizeBlur = () => {
+    if (localTerminalFontSize !== terminalFontSize) {
+      setTerminalFontSize(localTerminalFontSize);
+    }
   };
 
   return (
@@ -132,6 +162,39 @@ export function GeneralSettings() {
                   {locale === lang.code && <Check className="h-4 w-4 text-primary" />}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="mb-3 text-sm font-medium">{t.Settings.terminalFont.title}</h3>
+            <div className="space-y-4">
+              {/* Font Family */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t.Settings.terminalFont.fontFamily}</Label>
+                <Input
+                  value={localTerminalFont}
+                  onChange={(e) => setLocalTerminalFont(e.target.value)}
+                  onBlur={handleFontBlur}
+                  placeholder={t.Settings.terminalFont.placeholder}
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              {/* Font Size */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t.Settings.terminalFont.fontSize}</Label>
+                <Input
+                  type="number"
+                  min="8"
+                  max="72"
+                  value={localTerminalFontSize}
+                  onChange={(e) => setLocalTerminalFontSize(Number(e.target.value))}
+                  onBlur={handleFontSizeBlur}
+                  className="w-24"
+                />
+              </div>
+
+              <p className="text-sm text-muted-foreground">{t.Settings.terminalFont.description}</p>
             </div>
           </div>
 

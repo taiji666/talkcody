@@ -319,6 +319,14 @@ const zh: LocaleDefinition = {
       selectLanguage: '选择语言',
       autoDetect: '从浏览器自动检测',
     },
+    terminalFont: {
+      title: '终端字体',
+      description: '配置终端中使用的字体族和字体大小',
+      fontFamily: '字体族',
+      fontSize: '字体大小',
+      placeholder:
+        'Menlo, Monaco, "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Droid Sans Mono", "Courier New", monospace',
+    },
     theme: {
       title: '主题',
       description: '选择您偏好的外观主题',

@@ -57,6 +57,8 @@ interface SettingsState {
 
   // Terminal Settings
   terminal_shell: string; // 'auto' | 'pwsh' | 'powershell' | 'cmd' | custom path
+  terminal_font: string; // Terminal font family
+  terminal_font_size: number; // Terminal font size
 
   // Worktree Settings
   worktree_root_path: string; // Custom worktree root path (empty = use default ~/.talkcody)
@@ -134,6 +136,10 @@ interface SettingsActions {
   // Terminal Settings
   setTerminalShell: (shell: string) => Promise<void>;
   getTerminalShell: () => string;
+  setTerminalFont: (font: string) => Promise<void>;
+  getTerminalFont: () => string;
+  setTerminalFontSize: (size: number) => Promise<void>;
+  getTerminalFontSize: () => number;
 
   // Worktree Settings
   setWorktreeRootPath: (path: string) => Promise<void>;
@@ -175,6 +181,9 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized
   shortcuts: DEFAULT_SHORTCUTS,
   last_seen_version: '',
   terminal_shell: 'auto',
+  terminal_font:
+    'Menlo, Monaco, "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Droid Sans Mono", "Courier New", monospace',
+  terminal_font_size: 14,
   worktree_root_path: '',
 };
 
@@ -233,6 +242,11 @@ class SettingsDatabase {
       shortcut_saveFile: JSON.stringify(DEFAULT_SHORTCUTS.saveFile),
       shortcut_openModelSettings: JSON.stringify(DEFAULT_SHORTCUTS.openModelSettings),
       last_seen_version: '',
+      terminal_shell: 'auto',
+      terminal_font:
+        'Menlo, Monaco, "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Droid Sans Mono", "Courier New", monospace',
+      terminal_font_size: '14',
+      worktree_root_path: '',
     };
 
     const now = Date.now();
@@ -345,6 +359,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         'onboarding_completed',
         'last_seen_version',
         'terminal_shell',
+        'terminal_font',
+        'terminal_font_size',
         'worktree_root_path',
       ];
 
@@ -409,6 +425,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         apiKeys: apiKeys as ApiKeySettings,
         shortcuts: shortcuts as ShortcutSettings,
         last_seen_version: rawSettings.last_seen_version || '',
+        terminal_shell: rawSettings.terminal_shell || 'auto',
+        terminal_font:
+          rawSettings.terminal_font ||
+          'Menlo, Monaco, "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Droid Sans Mono", "Courier New", monospace',
+        terminal_font_size: Number(rawSettings.terminal_font_size) || 14,
         worktree_root_path: rawSettings.worktree_root_path || '',
         loading: false,
         isInitialized: true,
@@ -740,6 +761,27 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     return get().terminal_shell || 'auto';
   },
 
+  setTerminalFont: async (font: string) => {
+    await settingsDb.set('terminal_font', font);
+    set({ terminal_font: font });
+  },
+
+  getTerminalFont: () => {
+    return (
+      get().terminal_font ||
+      'Menlo, Monaco, "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Droid Sans Mono", "Courier New", monospace'
+    );
+  },
+
+  setTerminalFontSize: async (size: number) => {
+    await settingsDb.set('terminal_font_size', size.toString());
+    set({ terminal_font_size: size });
+  },
+
+  getTerminalFontSize: () => {
+    return get().terminal_font_size || 14;
+  },
+
   // Worktree Settings
   setWorktreeRootPath: async (path: string) => {
     await settingsDb.set('worktree_root_path', path);
@@ -886,6 +928,10 @@ export const settingsManager = {
   getLastSeenVersion: () => useSettingsStore.getState().getLastSeenVersion(),
   setTerminalShell: (shell: string) => useSettingsStore.getState().setTerminalShell(shell),
   getTerminalShell: () => useSettingsStore.getState().getTerminalShell(),
+  setTerminalFont: (font: string) => useSettingsStore.getState().setTerminalFont(font),
+  getTerminalFont: () => useSettingsStore.getState().getTerminalFont(),
+  setTerminalFontSize: (size: number) => useSettingsStore.getState().setTerminalFontSize(size),
+  getTerminalFontSize: () => useSettingsStore.getState().getTerminalFontSize(),
 
   // Worktree Settings
   setWorktreeRootPath: (path: string) => useSettingsStore.getState().setWorktreeRootPath(path),
