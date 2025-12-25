@@ -246,10 +246,10 @@ jobs:
           # List generated files
           echo ""
           echo "Generated files in macos directory:"
-          ls -la src-tauri/target/release/bundle/macos/ || echo "Directory not found"
+          ls -la src-tauri/target/x86_64-apple-darwin/release/bundle/macos/ || echo "Directory not found"
           echo ""
           echo "Generated files in dmg directory:"
-          ls -la src-tauri/target/release/bundle/dmg/ || echo "Directory not found"
+          ls -la src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/ || echo "Directory not found"
 
       - name: Upload Intel DMG to Release
         uses: actions/upload-release-asset@v1
@@ -257,7 +257,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/dmg/TalkCody_*.dmg
+          asset_path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/TalkCody_*.dmg
           asset_name: TalkCody-intel.dmg
           asset_content_type: application/x-apple-diskimage
 
@@ -267,6 +267,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: src-tauri/target/release/bundle/macos/*.app.tar.gz
+          asset_path: src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz
           asset_name: TalkCody-x86_64.app.tar.gz
           asset_content_type: application/gzip

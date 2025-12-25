@@ -6,30 +6,17 @@
 
 set -e  # Exit immediately on error
 
+# Source common library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/common.sh"
+
 echo "========================================="
 echo "TalkCody Release Process (Single Architecture)"
 echo "========================================="
 echo ""
 
-# Color definitions
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
 # Detect current machine architecture
-MACHINE_ARCH=$(uname -m)
-if [ "$MACHINE_ARCH" = "arm64" ]; then
-    BUILD_ARCH="aarch64"
-    ARCH_NAME="ARM64"
-elif [ "$MACHINE_ARCH" = "x86_64" ]; then
-    BUILD_ARCH="x86_64"
-    ARCH_NAME="x86_64"
-else
-    echo -e "${RED}Error: Unsupported architecture $MACHINE_ARCH${NC}"
-    exit 1
-fi
+detect_architecture
 
 echo -e "Detected architecture: ${BLUE}${ARCH_NAME}${NC}"
 echo ""
@@ -54,22 +41,7 @@ if [[ "$APPLE_SIGNING_IDENTITY" == *"YOUR_NAME"* ]]; then
 fi
 
 # Check Tauri signing private key
-if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-    echo -e "${RED}TAURI_SIGNING_PRIVATE_KEY environment variable is not set!${NC}"
-    echo ""
-    echo "This variable is used to sign auto-update packages (.app.tar.gz)"
-    echo ""
-    echo "Setup method:"
-    echo '        export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/talkcody.key)"'
-    echo '        export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""  # if password protected'
-    echo '        ./scripts/release.sh'
-    echo ""
-    echo "Tip: Private key file is usually at ~/.tauri/talkcody.key"
-    echo ""
-    exit 1
-fi
-
-echo -e "${GREEN}OK${NC} TAURI_SIGNING_PRIVATE_KEY is set"
+check_tauri_signing_key
 
 # Check required tools
 echo "Checking required tools..."
@@ -187,72 +159,21 @@ echo "Step 3/6: Generating/updating manifest.json..."
 # Read signature content
 SIGNATURE=$(cat "$UPDATER_SIG")
 
-# Get current date (ISO 8601 format)
-PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
 # CDN URL prefix
 CDN_BASE="https://cdn.talkcody.com"
 
 # Temp file path
 MANIFEST_FILE="/tmp/manifest-${VERSION}.json"
-R2_MANIFEST_PATH="releases/v${VERSION}/manifest.json"
+R2_MANIFEST_PATH="talkcody/releases/v${VERSION}/manifest.json"
 
-# Try to download existing manifest.json from R2 (with retry)
-echo "  Checking for existing manifest.json on R2..."
-MAX_RETRIES=3
-FETCH_SUCCESS=false
-
-for i in $(seq 1 $MAX_RETRIES); do
-    if wrangler r2 object get "talkcody/${R2_MANIFEST_PATH}" --file "$MANIFEST_FILE" --remote 2>/dev/null; then
-        # Validate JSON
-        if jq empty "$MANIFEST_FILE" 2>/dev/null; then
-            FETCH_SUCCESS=true
-            echo -e "${BLUE}  Found existing manifest.json, will merge current architecture${NC}"
-            break
-        else
-            echo -e "${YELLOW}  Downloaded manifest.json is invalid, retrying...${NC}"
-            rm -f "$MANIFEST_FILE"
-        fi
-    fi
-    if [ $i -lt $MAX_RETRIES ]; then
-        echo "  Retry $i/$MAX_RETRIES..."
-        sleep 2
-    fi
-done
-
-if [ "$FETCH_SUCCESS" = true ]; then
-    # Use jq to update corresponding architecture info
-    TEMP_MANIFEST=$(cat "$MANIFEST_FILE" | jq \
-        --arg version "$VERSION" \
-        --arg pubdate "$PUB_DATE" \
-        --arg arch "darwin-${BUILD_ARCH}" \
-        --arg url "${CDN_BASE}/releases/v${VERSION}/${UPDATER_BASENAME}" \
-        --arg sig "$SIGNATURE" \
-        --arg dmg "${CDN_BASE}/releases/v${VERSION}/$(basename "$DMG_FILE")" \
-        '.version = $version | .pub_date = $pubdate | .platforms[$arch] = {url: $url, signature: $sig, download_url: $dmg}')
-
-    echo "$TEMP_MANIFEST" > "$MANIFEST_FILE"
-else
-    echo -e "${YELLOW}  Existing manifest.json not found, creating new file${NC}"
-
-    # Generate new manifest.json (only contains current architecture)
-    MANIFEST_JSON=$(cat <<EOF
-{
-  "version": "${VERSION}",
-  "pub_date": "${PUB_DATE}",
-  "notes": "Release v${VERSION}",
-  "platforms": {
-    "darwin-${BUILD_ARCH}": {
-      "url": "${CDN_BASE}/releases/v${VERSION}/${UPDATER_BASENAME}",
-      "signature": "${SIGNATURE}",
-      "download_url": "${CDN_BASE}/releases/v${VERSION}/$(basename "$DMG_FILE")"
-    }
-  }
-}
-EOF
-)
-    echo "$MANIFEST_JSON" > "$MANIFEST_FILE"
-fi
+update_manifest_json \
+    "$VERSION" \
+    "darwin-${BUILD_ARCH}" \
+    "${CDN_BASE}/releases/v${VERSION}/${UPDATER_BASENAME}" \
+    "$SIGNATURE" \
+    "${CDN_BASE}/releases/v${VERSION}/$(basename "$DMG_FILE")" \
+    "$MANIFEST_FILE" \
+    "$R2_MANIFEST_PATH"
 
 echo -e "${GREEN}OK${NC} Manifest updated (${ARCH_NAME} architecture)"
 echo ""
@@ -282,55 +203,28 @@ echo "Step 5/6: Uploading files to R2..."
 R2_BUCKET="talkcody"
 VERSION_PATH="releases/v${VERSION}"
 
-# Helper function to upload with retry
-upload_with_retry() {
-    local file="$1"
-    local remote_path="$2"
-    local content_type="$3"
-    local max_retries=3
-    local retry_count=0
-
-    while [ $retry_count -lt $max_retries ]; do
-        if wrangler r2 object put "${remote_path}" \
-            --file "$file" \
-            --content-type "$content_type" \
-            --remote 2>&1; then
-            return 0
-        fi
-
-        retry_count=$((retry_count + 1))
-        if [ $retry_count -lt $max_retries ]; then
-            echo -e "${YELLOW}  Upload failed, retrying in 5 seconds (${retry_count}/${max_retries})...${NC}"
-            sleep 5
-        fi
-    done
-
-    echo -e "${RED}  Upload failed after ${max_retries} retries${NC}"
-    return 1
-}
-
 echo "  Uploading ${ARCH_NAME} DMG..."
-if ! upload_with_retry "$DMG_FILE" "${R2_BUCKET}/${VERSION_PATH}/$(basename "$DMG_FILE")" "application/x-apple-diskimage"; then
+if ! upload_to_r2_with_retry "$DMG_FILE" "${R2_BUCKET}/${VERSION_PATH}/$(basename "$DMG_FILE")" "application/x-apple-diskimage"; then
     exit 1
 fi
 
 echo "  Uploading ${ARCH_NAME} Updater Bundle..."
-if ! upload_with_retry "$UPDATER_BUNDLE" "${R2_BUCKET}/${VERSION_PATH}/${UPDATER_BASENAME}" "application/gzip"; then
+if ! upload_to_r2_with_retry "$UPDATER_BUNDLE" "${R2_BUCKET}/${VERSION_PATH}/${UPDATER_BASENAME}" "application/gzip"; then
     exit 1
 fi
 
 echo "  Uploading ${ARCH_NAME} Signature..."
-if ! upload_with_retry "$UPDATER_SIG" "${R2_BUCKET}/${VERSION_PATH}/${UPDATER_SIG_BASENAME}" "text/plain"; then
+if ! upload_to_r2_with_retry "$UPDATER_SIG" "${R2_BUCKET}/${VERSION_PATH}/${UPDATER_SIG_BASENAME}" "text/plain"; then
     exit 1
 fi
 
 echo "  Uploading/updating manifest.json..."
-if ! upload_with_retry "$MANIFEST_FILE" "${R2_BUCKET}/${VERSION_PATH}/manifest.json" "application/json"; then
+if ! upload_to_r2_with_retry "$MANIFEST_FILE" "${R2_BUCKET}/${VERSION_PATH}/manifest.json" "application/json"; then
     exit 1
 fi
 
 echo "  Updating latest.json..."
-if ! upload_with_retry "$LATEST_FILE" "${R2_BUCKET}/latest.json" "application/json"; then
+if ! upload_to_r2_with_retry "$LATEST_FILE" "${R2_BUCKET}/latest.json" "application/json"; then
     exit 1
 fi
 

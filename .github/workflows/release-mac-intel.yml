@@ -114,7 +114,7 @@ jobs:
       - name: Get DMG file path
         id: get_dmg
         run: |
-          dmgPath=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" -not -name "*.sig" | head -1)
+          dmgPath=$(find src-tauri/target/x86_64-apple-darwin/release/bundle/dmg -name "*.dmg" -not -name "*.sig" | head -1)
           if [ -z "$dmgPath" ]; then
             echo "ERROR: DMG file not found"
             exit 1
@@ -127,7 +127,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: talkcody-mac-intel-${{ github.sha }}
-          path: src-tauri/target/release/bundle/dmg/*.dmg
+          path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
           retention-days: 7
 
       - name: Upload Intel DMG to Release
@@ -145,7 +145,7 @@ jobs:
         if: github.event_name == 'push'
         id: get_bundle
         run: |
-          bundlePath=$(find src-tauri/target/release/bundle/macos -name "*.app.tar.gz" -not -name "*.sig" | head -1)
+          bundlePath=$(find src-tauri/target/x86_64-apple-darwin/release/bundle/macos -name "*.app.tar.gz" -not -name "*.sig" | head -1)
           if [ -z "$bundlePath" ]; then
             echo "ERROR: Updater bundle not found"
             exit 1

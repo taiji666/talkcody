@@ -6,63 +6,28 @@
 
 set -e  # Exit immediately on error
 
+# Source common library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/common.sh"
+
 echo "========================================="
 echo "TalkCody Build and Notarization Script (Single Architecture)"
 echo "========================================="
 echo ""
 
-# Color definitions
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
 # Detect current machine architecture
-MACHINE_ARCH=$(uname -m)
-if [ "$MACHINE_ARCH" = "arm64" ]; then
-    BUILD_ARCH="aarch64"
-    ARCH_NAME="ARM64 (Apple Silicon)"
-elif [ "$MACHINE_ARCH" = "x86_64" ]; then
-    BUILD_ARCH="x86_64"
-    ARCH_NAME="x86_64 (Intel)"
-else
-    echo -e "${RED}Error: Unsupported architecture $MACHINE_ARCH${NC}"
-    exit 1
-fi
+detect_architecture
+ARCH_NAME_FULL="$ARCH_NAME ($([ "$BUILD_ARCH" = "aarch64" ] && echo "Apple Silicon" || echo "Intel"))"
 
-echo -e "Detected architecture: ${BLUE}${ARCH_NAME}${NC}"
+echo -e "Detected architecture: ${BLUE}${ARCH_NAME_FULL}${NC}"
 echo -e "Build target: ${BLUE}${BUILD_ARCH}-apple-darwin${NC}"
 echo ""
 
 # Check required environment variables
 echo "Checking environment variables..."
 
-if [ -z "$APPLE_SIGNING_IDENTITY" ]; then
-    echo -e "${RED}Error: APPLE_SIGNING_IDENTITY environment variable is not set${NC}"
-    echo ""
-    echo "Please set signing identity, for example:"
-    echo 'export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAM_ID)"'
-    echo ""
-    exit 1
-fi
-
-echo -e "${GREEN}OK${NC} Signing identity: $APPLE_SIGNING_IDENTITY"
-
-# Check notarization credentials
-if ! xcrun notarytool history --keychain-profile "talkcody-notary" &>/dev/null; then
-    echo -e "${RED}Error: Notarization credentials not configured${NC}"
-    echo ""
-    echo "Please configure notarization credentials first:"
-    echo 'xcrun notarytool store-credentials "talkcody-notary" \'
-    echo '  --apple-id "your-email@example.com" \'
-    echo '  --password "your-app-specific-password" \'
-    echo '  --team-id "YOUR_TEAM_ID"'
-    echo ""
-    exit 1
-fi
-
-echo -e "${GREEN}OK${NC} Notarization credentials configured"
+check_apple_signing_identity
+check_notarization_credentials
 echo ""
 
 # Step 1: Build frontend
@@ -128,39 +93,10 @@ echo "  Signature: $(basename "$UPDATER_SIG")"
 echo ""
 
 # Step 4: Notarize DMG
-echo "Step 4/4: Submitting ${ARCH_NAME} DMG for notarization..."
-echo "  This may take 2-15 minutes, please wait..."
-echo ""
+echo "Step 4/4: Notarizing ${ARCH_NAME} DMG..."
 
-if xcrun notarytool submit \
-    --keychain-profile "talkcody-notary" \
-    --wait \
-    "$DMG_FILE"; then
-    echo ""
-    echo -e "${GREEN}OK${NC} Notarization successful!"
-else
-    echo ""
-    echo -e "${RED}Error: Notarization failed${NC}"
-    echo ""
-    echo "View detailed log:"
-    echo "xcrun notarytool log <submission-id> --keychain-profile \"talkcody-notary\""
+if ! notarize_dmg "$DMG_FILE"; then
     exit 1
-fi
-echo ""
-
-echo "Stapling notarization ticket to DMG..."
-if xcrun stapler staple "$DMG_FILE"; then
-    echo -e "${GREEN}OK${NC} Stapling successful"
-else
-    echo -e "${YELLOW}Warning${NC} Stapling failed (this may not affect distribution)"
-fi
-echo ""
-
-echo "Verifying notarization..."
-if spctl -a -vv -t install "$DMG_FILE" 2>&1 | grep -q "source=Notarized Developer ID"; then
-    echo -e "${GREEN}OK${NC} Notarization verification passed!"
-else
-    echo -e "${YELLOW}Warning${NC} Notarization verification failed, but this may be normal"
 fi
 echo ""
 

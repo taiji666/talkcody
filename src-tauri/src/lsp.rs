@@ -128,6 +128,11 @@ impl LspRegistry {
     pub fn list(&self) -> Vec<String> {
         self.servers.keys().cloned().collect()
     }
+
+    /// Check if a server exists for the given language and root path
+    pub fn exists(&self, language: &str, root_path: &str) -> bool {
+        self.server_index.contains_key(&(language.to_string(), root_path.to_string()))
+    }
 }
 
 /// Global LSP registry state
