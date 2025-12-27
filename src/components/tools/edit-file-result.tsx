@@ -78,61 +78,124 @@ function computeLCS(
   return lcs;
 }
 
-function generateDiff(original: string, modified: string): DiffLine[] {
+function generateDiff(
+  original: string,
+  modified: string
+): { diff: DiffLine[]; isTooLarge: boolean } {
   const originalLines = original.split('\n');
   const modifiedLines = modified.split('\n');
 
-  const lcs = computeLCS(originalLines, modifiedLines);
+  // Find common prefix
+  let prefixSize = 0;
+  while (
+    prefixSize < originalLines.length &&
+    prefixSize < modifiedLines.length &&
+    originalLines[prefixSize] === modifiedLines[prefixSize]
+  ) {
+    prefixSize++;
+  }
+
+  // Find common suffix
+  let suffixSize = 0;
+  while (
+    suffixSize < originalLines.length - prefixSize &&
+    suffixSize < modifiedLines.length - prefixSize &&
+    originalLines[originalLines.length - 1 - suffixSize] ===
+      modifiedLines[modifiedLines.length - 1 - suffixSize]
+  ) {
+    suffixSize++;
+  }
+
+  const midOriginalLines = originalLines.slice(prefixSize, originalLines.length - suffixSize);
+  const midModifiedLines = modifiedLines.slice(prefixSize, modifiedLines.length - suffixSize);
+
+  // Check if the modified part is too large
+  if (
+    midOriginalLines.length > MAX_LINES_FOR_DIFF ||
+    midModifiedLines.length > MAX_LINES_FOR_DIFF
+  ) {
+    return { diff: [], isTooLarge: true };
+  }
+
+  const lcs = computeLCS(midOriginalLines, midModifiedLines);
 
   let originalIndex = 0;
   let modifiedIndex = 0;
-  const fullDiff: DiffLine[] = [];
+  const midDiff: DiffLine[] = [];
 
   for (const line of lcs) {
     while (originalIndex < line.originalIndex) {
-      fullDiff.push({
+      midDiff.push({
         type: 'removed',
-        content: originalLines[originalIndex] ?? '',
-        originalLineNumber: originalIndex + 1,
+        content: midOriginalLines[originalIndex] ?? '',
+        originalLineNumber: prefixSize + originalIndex + 1,
       });
       originalIndex++;
     }
 
     while (modifiedIndex < line.modifiedIndex) {
-      fullDiff.push({
+      midDiff.push({
         type: 'added',
-        content: modifiedLines[modifiedIndex] ?? '',
-        newLineNumber: modifiedIndex + 1,
+        content: midModifiedLines[modifiedIndex] ?? '',
+        newLineNumber: prefixSize + modifiedIndex + 1,
       });
       modifiedIndex++;
     }
 
-    fullDiff.push({
+    midDiff.push({
       type: 'unchanged',
       content: line.content,
-      originalLineNumber: line.originalIndex + 1,
-      newLineNumber: line.modifiedIndex + 1,
+      originalLineNumber: prefixSize + line.originalIndex + 1,
+      newLineNumber: prefixSize + line.modifiedIndex + 1,
     });
     originalIndex++;
     modifiedIndex++;
   }
 
-  while (originalIndex < originalLines.length) {
-    fullDiff.push({
+  while (originalIndex < midOriginalLines.length) {
+    midDiff.push({
       type: 'removed',
-      content: originalLines[originalIndex] ?? '',
-      originalLineNumber: originalIndex + 1,
+      content: midOriginalLines[originalIndex] ?? '',
+      originalLineNumber: prefixSize + originalIndex + 1,
     });
     originalIndex++;
   }
 
-  while (modifiedIndex < modifiedLines.length) {
-    fullDiff.push({
+  while (modifiedIndex < midModifiedLines.length) {
+    midDiff.push({
       type: 'added',
-      content: modifiedLines[modifiedIndex] ?? '',
-      newLineNumber: modifiedIndex + 1,
+      content: midModifiedLines[modifiedIndex] ?? '',
+      newLineNumber: prefixSize + modifiedIndex + 1,
     });
     modifiedIndex++;
+  }
+
+  // Combine prefix (as unchanged), midDiff, and suffix (as unchanged)
+  const fullDiff: DiffLine[] = [];
+
+  // Add prefix
+  for (let i = 0; i < prefixSize; i++) {
+    fullDiff.push({
+      type: 'unchanged',
+      content: originalLines[i] ?? '',
+      originalLineNumber: i + 1,
+      newLineNumber: i + 1,
+    });
+  }
+
+  // Add midDiff
+  fullDiff.push(...midDiff);
+
+  // Add suffix
+  for (let i = 0; i < suffixSize; i++) {
+    const originalIdx = originalLines.length - suffixSize + i;
+    const modifiedIdx = modifiedLines.length - suffixSize + i;
+    fullDiff.push({
+      type: 'unchanged',
+      content: originalLines[originalIdx] ?? '',
+      originalLineNumber: originalIdx + 1,
+      newLineNumber: modifiedIdx + 1,
+    });
   }
 
   const contextLines = 3;
@@ -151,11 +214,14 @@ function generateDiff(original: string, modified: string): DiffLine[] {
         const contextStart = Math.max(0, i - contextLines);
         for (let j = contextStart; j < i; j++) {
           const contextLine = fullDiff[j];
-          if (contextLine?.type === 'unchanged') {
+          if (contextLine?.type === 'unchanged' || contextLine?.type === 'context') {
             diff.push({
               type: 'context',
               content: contextLine.content ?? '',
-              lineNumber: contextLine.originalLineNumber,
+              lineNumber:
+                contextLine.originalLineNumber ||
+                contextLine.newLineNumber ||
+                contextLine.lineNumber,
               originalLineNumber: contextLine.originalLineNumber,
               newLineNumber: contextLine.newLineNumber,
             });
@@ -174,7 +240,7 @@ function generateDiff(original: string, modified: string): DiffLine[] {
           diff.push({
             type: 'context',
             content: line.content ?? '',
-            lineNumber: line.originalLineNumber,
+            lineNumber: line.originalLineNumber || line.newLineNumber || line.lineNumber,
             originalLineNumber: line.originalLineNumber,
             newLineNumber: line.newLineNumber,
           });
@@ -195,7 +261,7 @@ function generateDiff(original: string, modified: string): DiffLine[] {
     }
   }
 
-  return diff;
+  return { diff, isTooLarge: false };
 }
 
 export function EditFileResult({ filePath, originalContent, newContent }: EditFileResultProps) {
@@ -203,11 +269,8 @@ export function EditFileResult({ filePath, originalContent, newContent }: EditFi
   const originalLineCount = originalContent.split('\n').length;
   const newLineCount = newContent.split('\n').length;
 
-  // Check if file is too large for LCS diff computation
-  const isTooLarge = originalLineCount > MAX_LINES_FOR_DIFF || newLineCount > MAX_LINES_FOR_DIFF;
-
-  // Only compute diff for reasonably sized files
-  const diff = isTooLarge ? [] : generateDiff(originalContent, newContent);
+  // Only compute diff for reasonably sized changes
+  const { diff, isTooLarge } = generateDiff(originalContent, newContent);
 
   // For large files, estimate changes by comparing line counts
   const addedLines = isTooLarge
