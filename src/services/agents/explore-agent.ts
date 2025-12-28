@@ -2,7 +2,7 @@ import { getToolSync } from '@/lib/tools';
 import type { AgentDefinition } from '@/types/agent';
 import { ModelType } from '@/types/model-types';
 
-const ContextGatheringPromptTemplate = `
+const ExplorePromptTemplate = `
 You are an 'Explore' agent. Your role is to efficiently collect specific information to answer a focused question. You are optimized for concise, targeted information gathering.
 
 You gather context for coding tasks, with access to the developer's codebase.
@@ -131,7 +131,7 @@ export class ExploreAgent {
       description: 'Efficient single-task information gathering',
       modelType: ModelType.MAIN,
       version: ExploreAgent.VERSION,
-      systemPrompt: ContextGatheringPromptTemplate,
+      systemPrompt: ExplorePromptTemplate,
       tools: selectedTools,
       hidden: true,
       isDefault: true,

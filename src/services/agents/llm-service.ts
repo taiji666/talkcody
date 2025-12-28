@@ -301,6 +301,11 @@ export class LLMService {
         const t = this.getTranslations();
         onStatus?.(t.LLMService.status.initializing);
 
+        // Update task with the model being used if it's a main task
+        if (this.taskId && !isSubagent) {
+          useTaskStore.getState().updateTask(this.taskId, { model });
+        }
+
         const providerStore = useProviderStore.getState();
         const isAvailable = providerStore.isModelAvailable(model);
         if (!isAvailable) {

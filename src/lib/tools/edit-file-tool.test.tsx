@@ -47,7 +47,7 @@ import { notificationService } from '@/services/notification-service';
 import { useEditReviewStore } from '@/stores/edit-review-store';
 
 // Context required by execute function
-const testContext = { taskId: 'conv-123' };
+const testContext = { taskId: 'conv-123', toolId: 'tool-123' };
 
 describe('editFile tool', () => {
   const mockRepositoryService = repositoryService as any;

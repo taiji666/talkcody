@@ -125,6 +125,7 @@ function MessageItemComponent({
                 input={unifiedInput}
                 output={item.output}
                 taskId={message.taskId}
+                toolCallId={item.toolCallId}
               >
                 {item.output ? (
                   <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -235,6 +236,7 @@ function MessageItemComponent({
                 input={input}
                 output={item.output}
                 taskId={message.taskId}
+                toolCallId={item.toolCallId}
               >
                 {resultComponent}
               </UnifiedToolResult>

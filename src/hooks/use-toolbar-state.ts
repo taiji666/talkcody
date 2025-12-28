@@ -52,6 +52,7 @@ export function useToolbarState(): ToolbarState {
   const inputTokens = currentTask?.input_token ?? 0;
   const outputTokens = currentTask?.output_token ?? 0;
   const contextUsage = currentTask?.context_usage ?? 0;
+  const taskModel = currentTask?.model;
 
   // Subscribe to settings store for reactive updates
   const {
@@ -68,7 +69,14 @@ export function useToolbarState(): ToolbarState {
   // Fetch current model identifier and format display name
   const updateModelName = useCallback(async () => {
     try {
-      const modelIdentifier = await modelService.getCurrentModel();
+      // Priority: 1. Model associated with the current task
+      //           2. Current global model from modelService
+      let modelIdentifier = taskModel;
+
+      if (!modelIdentifier) {
+        modelIdentifier = await modelService.getCurrentModel();
+      }
+
       if (!modelIdentifier) {
         setModelName('');
         return;
@@ -93,9 +101,9 @@ export function useToolbarState(): ToolbarState {
       logger.error('Failed to get current model:', error);
       setModelName('');
     }
-  }, [availableModels]);
+  }, [availableModels, taskModel]);
 
-  // Update model name when model type settings change
+  // Update model name when model type settings or task model change
   // biome-ignore lint/correctness/useExhaustiveDependencies: These dependencies trigger re-fetch when model settings change in the store
   useEffect(() => {
     updateModelName();
@@ -106,6 +114,7 @@ export function useToolbarState(): ToolbarState {
     model_type_image_generator,
     model_type_transcription,
     assistantId,
+    taskModel,
   ]);
 
   // Also listen for other events (modelsUpdated, settingsChanged)

@@ -107,6 +107,7 @@ The file path should be an absolute path.`,
               .getState()
               .addChange(
                 taskId,
+                context.toolId,
                 file_path,
                 fileExists ? 'edit' : 'write',
                 originalContent,
@@ -152,6 +153,7 @@ The file path should be an absolute path.`,
               .getState()
               .addChange(
                 taskId,
+                context.toolId,
                 file_path,
                 fileExists ? 'edit' : 'write',
                 originalContent,
@@ -186,6 +188,7 @@ The file path should be an absolute path.`,
               .getState()
               .addChange(
                 taskId,
+                context.toolId,
                 file_path,
                 fileExists ? 'edit' : 'write',
                 originalContent,
@@ -268,6 +271,7 @@ The file path should be an absolute path.`,
         .getState()
         .addChange(
           taskId,
+          context.toolId,
           file_path,
           fileExists ? 'edit' : 'write',
           originalContent,

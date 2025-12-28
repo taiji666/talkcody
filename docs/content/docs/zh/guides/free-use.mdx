@@ -16,16 +16,41 @@ TalkCody 旨在让每一位开发者都能便捷地使用 AI 提升效率。如�
 
 | 提供商 | 免费性质 | 优势 | 限制 |
 | :--- | :--- | :--- | :--- |
+| **TalkCody Free** | 完全免费 | 内置免配置，支持高性能模型 | 需要 GitHub 登录认证 |
 | **Qwen Code** | 完全免费 | 阿里通义千问大模型，编码能力强 | 需要通过 OAuth 认证 |
 | **Google AI Studio** | 个人免费额度 | Gemini 2.5 系列模型，上下文超长 | 每天 1500 次请求限制 |
 | **GitHub Copilot** | 订阅复用 | 复用已有订阅，无需额外付费 | 需要有 GitHub Copilot 订阅 |
 | **Ollama** | 本地运行 | 完全免费、离线隐私、无限使用 | 依赖本地电脑硬件性能 |
 | **Ollama Cloud** | 云端免费额度 | 访问顶级闭源模型 (MiniMax, GLM 等) | 每日/周有额度限制 |
 | **LM Studio** | 本地运行 | 界面友好、兼容 OpenAI API | 依赖本地电脑硬件性能 |
+| **OpenRouter** | 聚合免费模型 | 种类丰富、新模型抢先试用 | 依赖 OpenRouter 平台分配 |
 
 ---
 
-## 1. 通义千问 (Qwen Code)
+## 1. TalkCody Free
+
+TalkCody 官方提供的免费服务，旨在降低 AI 使用门槛，让用户开箱即用。
+
+<Steps>
+<Step>
+### GitHub 登录
+为避免 API 被滥用，使用 TalkCody Free 需要先通过 GitHub 账号登录。
+</Step>
+
+<Step>
+### 选择模型
+在 TalkCody 的模型选择器中，切换到 **TalkCody Free** 提供商。
+</Step>
+
+<Step>
+### 免费使用 MiniMax M2.1
+目前 TalkCody Free 长期提供 **MiniMax M2.1** 模型的免费访问。
+</Step>
+</Steps>
+
+---
+
+## 2. 通义千问 (Qwen Code)
 
 TalkCody 支持通过 Qwen Code OAuth 方式免费调用阿里通义千问编码模型。
 
@@ -49,7 +74,7 @@ TalkCody 会在每个平台自动检测 Qwen Code 客户端的 Token 文件位�
 
 ---
 
-## 2. Google AI Studio (Gemini)
+## 3. Google AI Studio (Gemini)
 
 Google 为开发者提供了非常慷慨的免费额度。
 
@@ -76,7 +101,7 @@ Google 为开发者提供了非常慷慨的免费额度。
 
 ---
 
-## 3. GitHub Copilot 订阅复用
+## 4. GitHub Copilot 订阅复用
 
 GitHub Copilot 有免费额度的订阅计划，TalkCody 支持通过复用该订阅来免费使用 Copilot 模型。
 
@@ -84,7 +109,7 @@ GitHub Copilot 有免费额度的订阅计划，TalkCody 支持通过复用该�
 
 ---
 
-## 4. Ollama (本地大模型)
+## 5. Ollama (本地大模型)
 
 如果您拥有一台配置尚可的电脑（建议 16GB+ 内存），可以在本地运行模型。
 
@@ -116,7 +141,7 @@ ollama pull llama3.2
 
 ---
 
-## 5. Ollama Cloud (云端免费大模型)
+## 6. Ollama Cloud (云端免费大模型)
 
 Ollama 不仅支持本地运行，还推出了 **Ollama Cloud** 服务，允许用户通过本地 Ollama 客户端直接调用云端的高性能模型。
 
@@ -174,7 +199,7 @@ ollama run gemini-3-flash-preview:cloud
 
 ---
 
-## 6. LM Studio (本地大模型)
+## 7. LM Studio (本地大模型)
 
 LM Studio 是另一个非常流行的本地运行开源 LLM 的桌面应用程序，它提供了一个直观的界面来发现、下载和运行模型。
 
@@ -197,5 +222,35 @@ LM Studio 是另一个非常流行的本地运行开源 LLM 的桌面应用程�
 <Step>
 ### 在 TalkCody 中配置
 在 TalkCody 设置 -> **API 密钥** 中，启用 **LM Studio** 开关。TalkCody 将自动检测运行在 `1234` 端口的本地服务，您可以在 **模型设置** 中选择已加载的模型。
+</Step>
+</Steps>
+
+---
+
+## 8. OpenRouter
+
+OpenRouter 是一个强大的模型聚合平台，它不仅能让你通过统一的接口访问各种模型，还提供了大量的免费资源。
+
+### 核心优势
+
+- **丰富的免费模型**：OpenRouter 始终保持着较多数量的免费模型可供使用。您可以访问其模型列表并筛选 "Free" 来查看当前可用的模型。
+- **新模型抢先体验**：许多 AI 厂商在推出新模型进行公测时，往往会选择在 OpenRouter 平台上提供限时的免费测试额度。
+
+### 配置方法
+
+<Steps>
+<Step>
+### 获取 API Key
+访问 [OpenRouter](https://openrouter.ai/) 注册并生成一个 API Key。
+</Step>
+
+<Step>
+### 在 TalkCody 中配置
+在 TalkCody 设置 -> **API 密钥** 中，将密钥粘贴到 **OpenRouter** 输入框中。
+</Step>
+
+<Step>
+### 发现免费模型
+在模型设置中，您可以搜索并添加 OpenRouter 提供的免费模型（通常带有 `:free` 后缀）。
 </Step>
 </Steps>

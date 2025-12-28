@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 export interface FileChange {
+  toolId: string;
   filePath: string;
   operation: 'write' | 'edit';
   timestamp: number;
@@ -15,6 +16,7 @@ interface FileChangesStore {
   // Add a file change for a task
   addChange: (
     taskId: string,
+    toolId: string,
     filePath: string,
     operation: 'write' | 'edit',
     originalContent?: string,
@@ -34,17 +36,13 @@ interface FileChangesStore {
 export const useFileChangesStore = create<FileChangesStore>((set, get) => ({
   changesByTask: new Map(),
 
-  addChange: (taskId, filePath, operation, originalContent, newContent) => {
+  addChange: (taskId, toolId, filePath, operation, originalContent, newContent) => {
     set((state) => {
       const newMap = new Map(state.changesByTask);
       const existing = newMap.get(taskId) || [];
 
-      // Check if this exact file path and operation already exists
-      const existingIndex = existing.findIndex(
-        (c) => c.filePath === filePath && c.operation === operation
-      );
-
       const newChange: FileChange = {
+        toolId,
         filePath,
         operation,
         timestamp: Date.now(),
@@ -52,14 +50,8 @@ export const useFileChangesStore = create<FileChangesStore>((set, get) => ({
         newContent,
       };
 
-      if (existingIndex >= 0) {
-        // Update existing change with latest content
-        existing[existingIndex] = newChange;
-        newMap.set(taskId, existing);
-      } else {
-        // Add new change
-        newMap.set(taskId, [...existing, newChange]);
-      }
+      // Always append new change to support multiple changes to the same file
+      newMap.set(taskId, [...existing, newChange]);
 
       return { changesByTask: newMap };
     });

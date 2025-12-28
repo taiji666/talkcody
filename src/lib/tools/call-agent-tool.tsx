@@ -95,6 +95,7 @@ export const callAgent = createTool({
 
     const addFailedStatus = (reason: string) => addStatus(`Failed: ${reason}`);
 
+    let fullText = '';
     try {
       logger.info(`callAgent: Start ${agentId}`, {
         task,
@@ -180,65 +181,93 @@ export const callAgent = createTool({
         throw new Error('taskId is required for callAgent tool');
       }
       const nestedLlmService = createLLMService(toolContext.taskId);
-      let fullText = '';
+
+      // Activity-based idle timeout logic
+      const timeoutMs = getNestedAgentTimeoutMs();
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      let timeoutReject: ((reason?: any) => void) | undefined;
+
+      const resetIdleTimer = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (timeoutReject) {
+            timeoutReject(
+              new Error(
+                `Agent ${agentId} execution timed out due to inactivity after ${
+                  timeoutMs / 1000
+                } seconds`
+              )
+            );
+          }
+        }, timeoutMs);
+      };
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutReject = reject;
+        resetIdleTimer();
+      });
 
       // Run the agent loop with timeout protection to prevent infinite loops
       // Pass parent's taskId so nested agent tools use the correct worktree path
-      const agentLoopPromise = nestedLlmService.runAgentLoop(
-        {
-          messages,
-          model: resolvedModel,
-          systemPrompt,
-          tools: agent.tools,
-          suppressReasoning: true,
-          isSubagent: true,
-        },
-        {
-          onChunk: (chunk) => {
-            fullText += chunk;
-          },
-          onComplete: (finalText) => {
-            fullText = finalText || fullText;
-            logger.info(`callAgent: Agent ${agentId} completed`);
-          },
-          onError: (error) => {
-            logger.error(`callAgent: Agent ${agentId} failed`, error);
-            if (error.message?.includes?.('Load failed')) {
-              logger.error(
-                'callAgent: Possible network/model loading issue. Check connection and API keys.'
-              );
-            }
-            addFailedStatus(error.message);
-            throw error;
-          },
-          onStatus: addStatus,
-          onToolMessage: (message: UIMessage) => {
-            try {
-              addNestedMessage(message);
-            } catch (error) {
-              logger.error(
-                '[callAgent] ❌ Failed to add nested tool message after helper:',
-                error,
-                {
-                  executionId,
-                  messageId: message.id,
+      const agentLoopPromise = (async () => {
+        try {
+          const result = await nestedLlmService.runAgentLoop(
+            {
+              messages,
+              model: resolvedModel,
+              systemPrompt,
+              tools: agent.tools,
+              isSubagent: true,
+              suppressReasoning: true,
+            },
+            {
+              onChunk: (chunk) => {
+                resetIdleTimer();
+                fullText += chunk;
+              },
+              onComplete: (finalText) => {
+                if (idleTimer) clearTimeout(idleTimer);
+                fullText = finalText || fullText;
+                logger.info(`callAgent: Agent ${agentId} completed`);
+              },
+              onError: (error) => {
+                if (idleTimer) clearTimeout(idleTimer);
+                logger.error(`callAgent: Agent ${agentId} failed`, error);
+                if (error.message?.includes?.('Load failed')) {
+                  logger.error(
+                    'callAgent: Possible network/model loading issue. Check connection and API keys.'
+                  );
                 }
-              );
-            }
-          },
-        },
-        _abortController
-      );
-
-      // Add timeout protection to prevent infinite loops
-      const timeoutMs = getNestedAgentTimeoutMs();
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(
-            new Error(`Agent ${agentId} execution timed out after ${timeoutMs / 1000} seconds`)
+                addFailedStatus(error.message);
+                // The error will be caught by the outer try-catch of the loop
+              },
+              onStatus: (status) => {
+                resetIdleTimer();
+                addStatus(status);
+              },
+              onToolMessage: (message: UIMessage) => {
+                resetIdleTimer();
+                try {
+                  addNestedMessage(message);
+                } catch (error) {
+                  logger.error(
+                    '[callAgent] ❌ Failed to add nested tool message after helper:',
+                    error,
+                    {
+                      executionId,
+                      messageId: message.id,
+                    }
+                  );
+                }
+              },
+            },
+            _abortController
           );
-        }, timeoutMs);
-      });
+          return result;
+        } finally {
+          if (idleTimer) clearTimeout(idleTimer);
+        }
+      })();
 
       await Promise.race([agentLoopPromise, timeoutPromise]);
 
@@ -251,17 +280,24 @@ export const callAgent = createTool({
 
       return { task, success: true, task_result: fullText };
     } catch (error) {
+      const errMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       logger.error(`callAgent: Failed to execute agent ${agentId}:`, error);
       addStatus('Failed to complete');
 
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Unknown error occurred',
+        message: errMessage,
+        task_result: fullText,
       };
     }
   },
-  renderToolDoing: ({ agentId, task, _toolCallId }) => (
-    <CallAgentToolDoing agentId={agentId} task={task} toolCallId={_toolCallId} />
+  renderToolDoing: ({ agentId, task, _toolCallId }, context) => (
+    <CallAgentToolDoing
+      agentId={agentId}
+      task={task}
+      toolCallId={_toolCallId}
+      taskId={context?.taskId}
+    />
   ),
   renderToolResult: (result, _params) => (
     <CallAgentToolResult

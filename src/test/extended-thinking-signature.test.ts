@@ -12,6 +12,24 @@ vi.mock('@/stores/settings-store', () => ({
   },
 }));
 
+// Mock model-config to avoid circular dependency
+vi.mock('@/providers/config/model-config', () => ({
+  GPT5_MINI: 'gpt-5-mini',
+  GPT51_CODE_MAX: 'gpt-51-codex-max',
+  MINIMAX_M21: 'minimax-m21',
+  GEMINI_25_FLASH_LITE: 'gemini-2.5-flash-lite',
+  CODE_STARL: 'codestral',
+  CLAUDE_HAIKU: 'claude-haiku-4.5',
+  GROK_CODE_FAST: 'grok-code-fast-1',
+  NANO_BANANA_PRO: 'gemini-3-pro-image',
+  SCRIBE_V2_REALTIME: 'scribe-v2-realtime',
+  MODEL_CONFIGS: {},
+  ensureModelsInitialized: vi.fn().mockResolvedValue(undefined),
+  refreshModelConfigs: vi.fn().mockResolvedValue(undefined),
+  getProvidersForModel: vi.fn().mockReturnValue([]),
+  getContextLength: vi.fn().mockReturnValue(200000),
+}));
+
 // Mock the logger
 vi.mock('@/lib/logger', () => ({
   logger: {
@@ -264,9 +282,9 @@ describe('Extended Thinking Signature Handling', () => {
       expect(content).toHaveLength(3);
       expect(content[0].type).toBe('reasoning');
       expect((content[0] as any).providerOptions).toEqual(sig1);
-      expect(content[1].type).toBe('text');
-      expect(content[2].type).toBe('reasoning');
-      expect((content[2] as any).providerOptions).toEqual(sig2);
+      expect(content[1].type).toBe('reasoning');
+      expect((content[1] as any).providerOptions).toEqual(sig2);
+      expect(content[2].type).toBe('text');
     });
 
     it('should handle redactedData in providerMetadata', () => {

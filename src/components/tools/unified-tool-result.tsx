@@ -20,6 +20,7 @@ interface UnifiedToolResultProps {
   isError?: boolean;
   children: React.ReactNode;
   taskId?: string;
+  toolCallId?: string;
 }
 
 /**
@@ -99,6 +100,7 @@ export function UnifiedToolResult({
   isError: explicitError,
   children,
   taskId,
+  toolCallId,
 }: UnifiedToolResultProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootPath = useRepositoryStore((state) => state.rootPath);
@@ -142,7 +144,9 @@ export function UnifiedToolResult({
     // For editFile: get diff from file-changes-store
     if (toolName === 'editFile' && input.file_path && taskId) {
       const changes = useFileChangesStore.getState().getChanges(taskId);
-      const fileChange = changes.find((c) => c.filePath === input.file_path);
+      const fileChange = toolCallId
+        ? changes.find((c) => c.toolId === toolCallId)
+        : changes.find((c) => c.filePath === input.file_path);
 
       if (fileChange?.originalContent && fileChange?.newContent) {
         return (

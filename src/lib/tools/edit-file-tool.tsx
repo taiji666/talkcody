@@ -340,6 +340,12 @@ Best practice workflow:
       if (!taskId) {
         throw new Error('taskId is required for editFile tool');
       }
+
+      const toolId = context?.toolId;
+      if (!toolId) {
+        throw new Error('toolId is required for editFile tool');
+      }
+
       const settingsJson = await TaskManager.getTaskSettings(taskId);
 
       if (settingsJson) {
@@ -354,7 +360,7 @@ Best practice workflow:
             // Track the file change
             useFileChangesStore
               .getState()
-              .addChange(taskId, file_path, 'edit', currentContent, finalContent);
+              .addChange(taskId, toolId, file_path, 'edit', currentContent, finalContent);
 
             return {
               success: true,
@@ -405,7 +411,7 @@ Best practice workflow:
             // Track the file change
             useFileChangesStore
               .getState()
-              .addChange(taskId, file_path, 'edit', currentContent, finalContent);
+              .addChange(taskId, toolId, file_path, 'edit', currentContent, finalContent);
 
             return { success: true, message };
           },
@@ -431,7 +437,7 @@ Best practice workflow:
             // Track the file change
             useFileChangesStore
               .getState()
-              .addChange(taskId, file_path, 'edit', currentContent, finalContent);
+              .addChange(taskId, toolId, file_path, 'edit', currentContent, finalContent);
 
             return { success: true, message };
           },
@@ -510,7 +516,7 @@ Best practice workflow:
         // Track the file change (taskId was validated earlier)
         useFileChangesStore
           .getState()
-          .addChange(taskId, file_path, 'edit', currentContent, finalContent);
+          .addChange(taskId, toolId, file_path, 'edit', currentContent, finalContent);
 
         return {
           success: true,

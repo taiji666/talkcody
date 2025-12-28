@@ -391,6 +391,14 @@ export class StreamProcessor {
       block.providerMetadata = this.deepMergeMetadata(block.providerMetadata, providerMetadata);
     }
 
+    // Always append text to the reasoning block, even if suppressReasoning is true
+    // This is critical for Claude API thinking mode compliance:
+    // When thinking is enabled, assistant messages must include thinking blocks
+    // Suppressing UI display doesn't mean we should drop the thinking content from API messages
+    if (block && text) {
+      block.text += text;
+    }
+
     // Skip UI updates for empty or whitespace-only reasoning
     if (!text || !text.trim()) {
       callbacks.onStatus?.(t.StreamProcessor.status.thinking);
@@ -404,11 +412,6 @@ export class StreamProcessor {
       this.state.fullText += formattedText;
       callbacks.onChunk(formattedText);
       this.state.isFirstReasoning = false;
-
-      // Append text to the reasoning block
-      if (block) {
-        block.text += text;
-      }
     }
 
     callbacks.onStatus?.(t.StreamProcessor.status.thinking);
@@ -433,15 +436,20 @@ export class StreamProcessor {
    * Get structured assistant content as an array of TextPart and ReasoningPart
    * This builds the proper AssistantContent format for Vercel AI SDK
    * ReasoningParts include providerOptions with signature for Claude API extended thinking
+   *
+   * CRITICAL: When thinking mode is enabled, Claude API requires:
+   * "a final assistant message must start with a thinking block (preceeding the lastmost set of tool_use and tool_result blocks)"
+   * Therefore, we MUST return reasoning parts BEFORE text parts, regardless of arrival order.
    */
   getAssistantContent(): Array<TextPart | ReasoningPart> {
-    const content: Array<TextPart | ReasoningPart> = [];
+    const reasoningParts: ReasoningPart[] = [];
+    const textParts: TextPart[] = [];
 
     for (const order of this.state.contentOrder) {
       if (order.type === 'text') {
         const text = this.state.textParts[order.index];
         if (text?.trim()) {
-          content.push({ type: 'text', text: text.trim() });
+          textParts.push({ type: 'text', text: text.trim() });
         }
       } else if (order.type === 'reasoning') {
         const block = this.state.reasoningBlocks[order.index];
@@ -457,12 +465,14 @@ export class StreamProcessor {
             // biome-ignore lint/suspicious/noExplicitAny: AI SDK type compatibility
             (reasoningPart as any).providerOptions = block.providerMetadata;
           }
-          content.push(reasoningPart);
+          reasoningParts.push(reasoningPart);
         }
       }
     }
 
-    return content;
+    // CRITICAL: Return reasoning parts FIRST, then text parts
+    // This ensures compliance with Claude API thinking mode requirement
+    return [...reasoningParts, ...textParts];
   }
 
   /**
