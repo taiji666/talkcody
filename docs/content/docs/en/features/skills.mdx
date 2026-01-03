@@ -19,6 +19,37 @@ A Skill contains:
 
 By activating different Skills, agents can quickly acquire specialized capabilities in specific domains.
 
+<Callout type="info">
+TalkCody fully complies with the [Agent Skills Specification](https://agentskills.io) standard, ensuring complete compatibility with other tools that support this standard (such as Claude Code, GitHub Copilot).
+</Callout>
+
+## Agent Skills Standard
+
+TalkCody's Skills system is based on the Agent Skills Specification, an open industry standard that defines a universal format for AI agent skills.
+
+### Standard Directory Structure
+
+```
+skill-name/
+├── SKILL.md          # Required: skill definition and description
+├── scripts/          # Optional: executable scripts
+│   ├── setup.py
+│   └── analyze.sh
+├── references/       # Optional: detailed reference documentation
+│   ├── REFERENCE.md
+│   └── api-guide.md
+└── assets/           # Optional: static resources
+    ├── template.json
+    └── diagram.svg
+```
+
+### Interoperability
+
+Because it fully complies with the standard, TalkCody can:
+- ✅ Import Skills from other tools (such as Claude Code Skills)
+- ✅ Export Skills for use in other tools
+- ✅ Share Skill repositories with tools that support this standard
+
 ## Use Cases
 
 - **Database Development**: SQL syntax, query optimization, database design
@@ -34,10 +65,44 @@ By activating different Skills, agents can quickly acquire specialized capabilit
 2. Select the desired Skill from the list
 3. The selected Skill is automatically applied to the current conversation
 
-### Download Skills
+### Install Skills
+
+#### Install from Marketplace
+
 1. Go to the **Skills page**
 2. Check the "Remote Skills" tab
 3. Click **Install** to download the desired Skill
+
+#### Import from GitHub
+
+TalkCody supports direct import of standard-format Skills from GitHub.
+
+**Import a Single Skill**
+
+1. Click **Import from GitHub** on the Skills page
+2. Enter the GitHub URL of a single Skill directory, for example:
+   ```
+   https://github.com/anthropics/skills/tree/main/skills/canvas-design
+   ```
+3. Click **Scan** to scan
+4. Click **Import** to import after confirmation
+
+**Batch Import Skills**
+
+1. Click **Import from GitHub** on the Skills page
+2. Enter the directory URL containing multiple Skills, for example:
+   ```
+   https://github.com/anthropics/skills/tree/main/skills
+   ```
+3. Click **Scan** to scan all subdirectories
+4. Select the Skills you want to import
+5. Click **Import** to batch import
+
+<Callout type="tip">
+The import feature automatically recognizes directory types:
+- If a directory contains a `SKILL.md` file, it will be imported as a single Skill
+- If a directory contains multiple subdirectories, it will scan all subdirectories and batch import Skills that meet the standard
+</Callout>
 
 ### Manage Skills
 
@@ -51,6 +116,15 @@ By activating different Skills, agents can quickly acquire specialized capabilit
 3. Write system prompt snippet
 4. Add workflow rules (optional)
 5. Save
+
+**Edit Skills**
+- Find the Skill you want to edit in the Local Skills list
+- Click the edit button to modify content
+- Save changes
+
+<Callout type="info">
+Created Skills automatically comply with the Agent Skills Specification standard and can be exported for use in other tools.
+</Callout>
 
 ## Relationship with Agents
 
@@ -66,6 +140,25 @@ Differences between Skills and Agents:
 <Callout type="tip">
 An Agent can use multiple Skills simultaneously, gaining specialized capabilities across multiple domains.
 </Callout>
+
+## Migrating from Other Tools
+
+### Import Claude Code Skills
+
+If you already have Claude Code Skills, you can use them directly in TalkCody:
+
+1. Copy the Claude Code Skills directory to the TalkCody Skills directory
+2. Or use the GitHub import feature to import from the repository
+
+TalkCody will automatically recognize and load Skills that comply with the standard.
+
+### Import Other Agent Skills
+
+Any Skill that complies with the Agent Skills Specification can be used in TalkCody:
+
+- GitHub Copilot Skills
+- VS Code Agent Skills
+- Or Skills created by other tools that support this standard
 
 ## Best Practices
 
@@ -87,3 +180,24 @@ Activated Skills:
 - API Security
 - Error Handling
 ```
+
+### Sharing Skills
+
+Because TalkCody Skills comply with open standards, you can easily share them:
+
+1. **Via Git Repository**
+   - Push the Skills directory to GitHub/GitLab
+   - Other users can use it via the GitHub import feature
+
+2. **Via Marketplace**
+   - Submit to TalkCody Skills Marketplace
+   - Let more users discover and use it
+
+3. **Cross-tool Usage**
+   - Your Skills can be used in other tools that support the Agent Skills Specification
+
+## Resource Links
+
+- [Agent Skills Specification](https://agentskills.io) - Official standard specification
+- [Anthropic Skills Repository](https://github.com/anthropics/skills) - Anthropic official Skills repository
+- [Community Skills](https://github.com/ComposioHQ/awesome-claude-skills) - Community Skills collection

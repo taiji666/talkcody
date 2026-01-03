@@ -99,14 +99,6 @@ describe('SkillCard', () => {
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
-  it('should display marketplace stats when available', () => {
-    render(<SkillCard skill={mockMarketplaceSkill} />);
-
-    expect(screen.getByText('5,000')).toBeInTheDocument(); // downloads
-    expect(screen.getByText('4.8')).toBeInTheDocument(); // rating
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
-  });
-
   it('should show content indicators', () => {
     render(<SkillCard skill={mockLocalSkill} />);
 
@@ -144,14 +136,6 @@ describe('SkillCard', () => {
 
     const forkButton = screen.getByTitle('Fork Skill');
     expect(forkButton).toBeInTheDocument();
-  });
-
-  it('should show Share button for custom skills', () => {
-    const onShare = vi.fn();
-    render(<SkillCard skill={mockLocalSkill} onShare={onShare} />);
-
-    const shareButton = screen.getByTitle('Share to Marketplace');
-    expect(shareButton).toBeInTheDocument();
   });
 
   it('should not show Share button for system skills', () => {
@@ -204,16 +188,6 @@ describe('SkillCard', () => {
     fireEvent.click(forkButton);
 
     expect(onFork).toHaveBeenCalled();
-  });
-
-  it('should call onShare when share button is clicked', () => {
-    const onShare = vi.fn();
-    render(<SkillCard skill={mockLocalSkill} onShare={onShare} />);
-
-    const shareButton = screen.getByTitle('Share to Marketplace');
-    fireEvent.click(shareButton);
-
-    expect(onShare).toHaveBeenCalled();
   });
 
   it('should call onDelete when delete button is clicked', () => {

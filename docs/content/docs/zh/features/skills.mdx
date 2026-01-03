@@ -19,6 +19,37 @@ Skill 包含：
 
 通过激活不同的 Skills，智能体可以快速获得特定领域的专业能力。
 
+<Callout type="info">
+TalkCody 完全遵循 [Agent Skills Specification](https://agentskills.io) 标准，确保与其他支持该标准的工具（如 Claude Code、GitHub Copilot）完全兼容。
+</Callout>
+
+## Agent Skills 标准
+
+TalkCody 的 Skills 系统基于 Agent Skills Specification，这是一个开放的行业标准，定义了 AI 智能体技能的通用格式。
+
+### 标准目录结构
+
+```
+skill-name/
+├── SKILL.md          # 必需：技能定义和说明
+├── scripts/          # 可选：可执行脚本
+│   ├── setup.py
+│   └── analyze.sh
+├── references/       # 可选：详细参考文档
+│   ├── REFERENCE.md
+│   └── api-guide.md
+└── assets/           # 可选：静态资源
+    ├── template.json
+    └── diagram.svg
+```
+
+### 互操作性
+
+因为完全符合标准，TalkCody 可以：
+- ✅ 导入来自其他工具的 Skills（如 Claude Code Skills）
+- ✅ 导出 Skills 供其他工具使用
+- ✅ 与支持该标准的工具共享 Skills 仓库
+
 ## 使用场景
 
 - **数据库开发**：SQL 语法、查询优化、数据库设计
@@ -34,10 +65,44 @@ Skill 包含：
 2. 从列表中选择需要的 Skill
 3. 选中的 Skill 自动应用到当前对话
 
-### 下载 Skill
+### 安装 Skills
+
+#### 从 Marketplace 安装
+
 1. 进入 **Skills 页面**
 2. 查看 "Remote Skills" 标签
 3. 点击 **Install** 下载所需的 Skill
+
+#### 从 GitHub 导入
+
+TalkCody 支持直接从 GitHub 导入标准格式的 Skills。
+
+**导入单个 Skill**
+
+1. 在 Skills 页面点击 **Import from GitHub**
+2. 输入单个 Skill 目录的 GitHub URL，例如：
+   ```
+   https://github.com/anthropics/skills/tree/main/skills/canvas-design
+   ```
+3. 点击 **Scan** 扫描
+4. 确认后点击 **Import** 导入
+
+**批量导入 Skills**
+
+1. 在 Skills 页面点击 **Import from GitHub**
+2. 输入包含多个 Skills 的目录 URL，例如：
+   ```
+   https://github.com/anthropics/skills/tree/main/skills
+   ```
+3. 点击 **Scan** 扫描所有子目录
+4. 选择要导入的 Skills
+5. 点击 **Import** 批量导入
+
+<Callout type="tip">
+导入功能支持自动识别目录类型：
+- 如果目录包含 `SKILL.md` 文件，将作为单个 Skill 导入
+- 如果目录包含多个子目录，将扫描所有子目录并批量导入符合标准的 Skills
+</Callout>
 
 ### 管理 Skills
 
@@ -51,6 +116,15 @@ Skill 包含：
 3. 编写系统提示片段
 4. 添加工作流规则（可选）
 5. 保存
+
+**编辑 Skill**
+- 在 Local Skills 列表中找到要编辑的 Skill
+- 点击编辑按钮修改内容
+- 保存更改
+
+<Callout type="info">
+创建的 Skill 自动符合 Agent Skills Specification 标准，可以导出供其他工具使用。
+</Callout>
 
 ## 与智能体的关系
 
@@ -66,6 +140,25 @@ Skills 和 Agents 的区别：
 <Callout type="tip">
 一个 Agent 可以同时使用多个 Skills，获得多领域的专业能力。
 </Callout>
+
+## 从其他工具迁移
+
+### 导入 Claude Code Skills
+
+如果你已经有 Claude Code 的 Skills，可以直接在 TalkCody 中使用：
+
+1. 复制 Claude Code Skills 目录到 TalkCody Skills 目录
+2. 或使用 GitHub 导入功能从仓库导入
+
+TalkCody 会自动识别并加载符合标准的 Skills。
+
+### 导入其他 Agent Skills
+
+任何符合 Agent Skills Specification 的 Skill 都可以在 TalkCody 中使用：
+
+- GitHub Copilot Skills
+- VS Code Agent Skills
+- 或其他支持该标准的工具创建的 Skills
 
 ## 最佳实践
 
@@ -87,3 +180,24 @@ Skills 和 Agents 的区别：
 - API Security
 - Error Handling
 ```
+
+### 分享 Skills
+
+因为 TalkCody Skills 符合开放标准，你可以轻松分享：
+
+1. **通过 Git 仓库**
+   - 将 Skills 目录推送到 GitHub/GitLab
+   - 其他用户可以通过 GitHub 导入功能使用
+
+2. **通过 Marketplace**
+   - 提交到 TalkCody Skills Marketplace
+   - 让更多用户发现和使用
+
+3. **跨工具使用**
+   - 你的 Skills 可以在其他支持 Agent Skills Specification 的工具中使用
+
+## 资源链接
+
+- [Agent Skills Specification](https://agentskills.io) - 官方标准规范
+- [Anthropic Skills Repository](https://github.com/anthropics/skills) - Anthropic 官方 Skills 仓库
+- [Community Skills](https://github.com/ComposioHQ/awesome-claude-skills) - 社区 Skills 集合
