@@ -3,6 +3,12 @@
 
 import { logger } from '@/lib/logger';
 import { simpleFetch } from '@/lib/tauri-fetch';
+import {
+  getRemainingPercentage,
+  getTimeUntilReset,
+  getUsageLevel,
+  getWeeklyResetDisplay,
+} from '@/lib/usage-utils';
 import { CLAUDE_OAUTH_BETA_HEADERS } from '@/providers/oauth/claude-oauth-service';
 import { getClaudeOAuthAccessToken } from '@/providers/oauth/claude-oauth-store';
 
@@ -143,49 +149,5 @@ export async function fetchClaudeUsage(): Promise<ClaudeUsageData> {
   }
 }
 
-/**
- * Calculate time remaining until reset
- *
- * @param resetAt ISO 8601 timestamp
- * @returns Human-readable time remaining string
- */
-export function getTimeUntilReset(resetAt: string): string {
-  const resetTime = new Date(resetAt).getTime();
-  const now = Date.now();
-  const diffMs = resetTime - now;
-
-  if (diffMs <= 0) {
-    return 'Resetting soon...';
-  }
-
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m`;
-}
-
-/**
- * Get usage level indicator
- *
- * @param utilizationPct Usage percentage (0-100)
- * @returns 'low' | 'medium' | 'high' | 'critical'
- */
-export function getUsageLevel(utilizationPct: number): 'low' | 'medium' | 'high' | 'critical' {
-  if (utilizationPct < 50) return 'low';
-  if (utilizationPct < 75) return 'medium';
-  if (utilizationPct < 90) return 'high';
-  return 'critical';
-}
-
-/**
- * Calculate remaining percentage
- *
- * @param utilizationPct Usage percentage (0-100)
- * @returns Remaining percentage (0-100)
- */
-export function getRemainingPercentage(utilizationPct: number): number {
-  return Math.max(0, 100 - utilizationPct);
-}
+// Re-export utility functions for backward compatibility
+export { getTimeUntilReset, getWeeklyResetDisplay, getUsageLevel, getRemainingPercentage };

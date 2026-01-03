@@ -18,6 +18,7 @@ import {
   getRemainingPercentage as getClaudeRemainingPercentage,
   getTimeUntilReset as getClaudeTimeUntilReset,
   getUsageLevel as getClaudeUsageLevel,
+  getWeeklyResetDisplay as getClaudeWeeklyResetDisplay,
 } from '@/services/claude-usage-service';
 import {
   getRemainingPercentage as getCopilotRemainingPercentage,
@@ -27,6 +28,7 @@ import {
   getRemainingPercentage as getOpenAIRemainingPercentage,
   getTimeUntilReset as getOpenAITimeUntilReset,
   getUsageLevel as getOpenAIUsageLevel,
+  getWeeklyResetDisplay as getOpenAIWeeklyResetDisplay,
 } from '@/services/openai-usage-service';
 import {
   getRemainingPercentage as getZhipuRemainingPercentage,
@@ -245,8 +247,18 @@ function ClaudeUsageTab() {
       {/* 7-Day Weekly Usage */}
       <Card>
         <CardHeader>
-          <CardTitle>{t.usage.sevenDay.title}</CardTitle>
-          <CardDescription>{t.usage.sevenDay.description}</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>{t.usage.sevenDay.title}</CardTitle>
+              <CardDescription>{t.usage.sevenDay.description}</CardDescription>
+            </div>
+            {usageData.seven_day.reset_at && (
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {t.usage.resetsIn}: {getClaudeWeeklyResetDisplay(usageData.seven_day.reset_at)}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -270,8 +282,19 @@ function ClaudeUsageTab() {
           {usageData.seven_day_sonnet && (
             <Card>
               <CardHeader>
-                <CardTitle>{t.usage.sonnet.title}</CardTitle>
-                <CardDescription>{t.usage.sonnet.description}</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>{t.usage.sonnet.title}</CardTitle>
+                    <CardDescription>{t.usage.sonnet.description}</CardDescription>
+                  </div>
+                  {usageData.seven_day_sonnet.reset_at && (
+                    <Badge variant="outline" className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {t.usage.resetsIn}:{' '}
+                      {getClaudeWeeklyResetDisplay(usageData.seven_day_sonnet.reset_at)}
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -293,8 +316,19 @@ function ClaudeUsageTab() {
           {usageData.seven_day_opus && (
             <Card>
               <CardHeader>
-                <CardTitle>{t.usage.opus.title}</CardTitle>
-                <CardDescription>{t.usage.opus.description}</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>{t.usage.opus.title}</CardTitle>
+                    <CardDescription>{t.usage.opus.description}</CardDescription>
+                  </div>
+                  {usageData.seven_day_opus.reset_at && (
+                    <Badge variant="outline" className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {t.usage.resetsIn}:{' '}
+                      {getClaudeWeeklyResetDisplay(usageData.seven_day_opus.reset_at)}
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -781,8 +815,19 @@ function OpenAIUsageTab() {
       {/* 7-Day Weekly Usage */}
       <Card>
         <CardHeader>
-          <CardTitle>{t.openaiUsage.sevenDay.title}</CardTitle>
-          <CardDescription>{t.openaiUsage.sevenDay.description}</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>{t.openaiUsage.sevenDay.title}</CardTitle>
+              <CardDescription>{t.openaiUsage.sevenDay.description}</CardDescription>
+            </div>
+            {usageData.seven_day.reset_at && (
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {t.openaiUsage.resetsIn}:{' '}
+                {getOpenAIWeeklyResetDisplay(usageData.seven_day.reset_at)}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
