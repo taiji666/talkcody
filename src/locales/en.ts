@@ -1679,6 +1679,28 @@ const en: LocaleDefinition = {
     },
   },
 
+  Share: {
+    title: 'Share Task',
+    description: 'Create a shareable link to this task.',
+    messages: 'messages',
+    emptyTask: 'No messages to share',
+    created: 'Share link created',
+    failed: 'Failed to create share link',
+    copyFailed: 'Failed to copy link',
+    expiresIn: 'Expires in',
+    expires1d: '1 day',
+    expires7d: '7 days',
+    expires30d: '30 days',
+    expiresNever: 'Never',
+    passwordProtection: 'Password protection',
+    passwordPlaceholder: 'Enter password',
+    privacyNotice: 'File paths and sensitive data will be automatically sanitized.',
+    copyLink: 'Copy Link',
+    openInBrowser: 'Open in Browser',
+    passwordSet: 'This share is password protected.',
+    createLink: 'Create Link',
+  },
+
   minimaxUsage: {
     title: 'MiniMax Coding Plan Usage',
     description: 'Monitor your MiniMax Coding Plan usage',

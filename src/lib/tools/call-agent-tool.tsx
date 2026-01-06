@@ -261,12 +261,16 @@ export const callAgent = createTool({
                 // Check if this is a user interaction tool
                 const toolName = message.toolName;
 
-                // Tool call started
-                if (
-                  toolName &&
-                  userInteractionTools.has(toolName) &&
-                  message.role === 'assistant'
-                ) {
+                // Determine message type from content
+                // Tool messages have role: 'tool' with content[0].type being 'tool-call' or 'tool-result'
+                const contentType = Array.isArray(message.content)
+                  ? (message.content[0] as { type?: string })?.type
+                  : undefined;
+                const isToolCallStart = message.role === 'tool' && contentType === 'tool-call';
+                const isToolCallComplete = message.role === 'tool' && contentType === 'tool-result';
+
+                // Tool call started - pause timeout for user interaction tools
+                if (toolName && userInteractionTools.has(toolName) && isToolCallStart) {
                   activeUserInteractionTools.add(toolName);
                   isTimeoutPaused = true;
                   if (idleTimer) clearTimeout(idleTimer);
@@ -275,15 +279,15 @@ export const callAgent = createTool({
                   });
                 }
 
-                // Tool call completed
-                if (toolName && userInteractionTools.has(toolName) && message.role === 'tool') {
+                // Tool call completed - resume timeout if no more user interaction tools active
+                if (toolName && userInteractionTools.has(toolName) && isToolCallComplete) {
                   activeUserInteractionTools.delete(toolName);
                   if (activeUserInteractionTools.size === 0) {
                     isTimeoutPaused = false;
                     logger.info(`[callAgent] Timeout resumed after user interaction`, { agentId });
                     resetIdleTimer(); // Resume timeout
                   }
-                } else {
+                } else if (!userInteractionTools.has(toolName || '')) {
                   // For non-user-interaction tools, always reset timer
                   resetIdleTimer();
                 }

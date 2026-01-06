@@ -141,6 +141,19 @@ pub const CODE_FILENAMES: &[&str] = &[
     "cakefile",
     "gruntfile",
     "gulpfile",
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.production",
+    ".env.test",
+    ".gitignore",
+    ".gitattributes",
+    ".editorconfig",
+    ".eslintrc",
+    ".prettierrc",
+    ".babelrc",
+    ".npmrc",
+    ".yarnrc",
 ];
 
 /// Binary file extensions to exclude

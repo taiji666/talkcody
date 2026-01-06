@@ -113,37 +113,37 @@ export const EnvProvider: PromptContextProvider = {
     placement: 'append',
     sectionTitle: 'Environment Context',
     sectionTemplate(values: Record<string, string>) {
-      const sections: string[] = [];
+      const xmlElements: string[] = [];
 
       if (values.working_directory) {
         logger.info('[EnvProvider] Working directory detected:', values.working_directory);
-        sections.push(`Working directory: ${values.working_directory}`);
+        xmlElements.push(`<working_directory>${values.working_directory}</working_directory>`);
       }
 
       if (values.is_git_repo) {
-        sections.push(`Is directory a git repo: ${values.is_git_repo}`);
+        xmlElements.push(`<is_git_repo>${values.is_git_repo}</is_git_repo>`);
       }
 
       if (values.platform) {
-        sections.push(`Platform: ${values.platform}`);
+        xmlElements.push(`<platform>${values.platform}</platform>`);
       }
 
       if (values.today_date) {
-        sections.push(`Today's date: ${values.today_date}`);
+        xmlElements.push(`<today_date>${values.today_date}</today_date>`);
       }
 
       if (values.plan_mode) {
-        sections.push(`Plan Mode: ${values.plan_mode}`);
+        xmlElements.push(`<plan_mode>${values.plan_mode}</plan_mode>`);
       }
 
-      if (sections.length === 0) {
+      if (xmlElements.length === 0) {
         return '';
       }
 
       return [
         'IMPORTANT: Here is important information about the environment you are running in:',
         '<env>',
-        ...sections,
+        ...xmlElements,
         '</env>',
       ].join('\n');
     },

@@ -50,13 +50,8 @@ impl HighPerformanceFileSearch {
 
         // Use sequential file collection with ignore crate for simplicity and correctness
         let mut walker_builder = WalkBuilder::new(root_path);
-
         walker_builder
-            .hidden(false) // Allow hidden files like .github
-            .git_ignore(true)
-            .git_global(true)
-            .git_exclude(true)
-            .ignore(true)
+            .standard_filters(false)
             .parents(true)
             .max_depth(Some(20))
             .filter_entry(|entry| {
@@ -94,8 +89,13 @@ impl HighPerformanceFileSearch {
                     continue;
                 }
 
-                if let Some(filename) = path.file_name().and_then(OsStr::to_str) {
-                    if let Some(search_result) = self.match_filename(filename, path, &keywords) {
+                if let Ok(relative_path) = path.strip_prefix(root_path) {
+                    let relative_path_str = relative_path.to_string_lossy();
+                    // Normalize path separators to forward slashes for cross-platform search
+                    let normalized_path = relative_path_str.replace('\\', "/");
+
+                    if let Some(search_result) = self.match_path(&normalized_path, path, &keywords)
+                    {
                         results.push(search_result);
                         if results.len() >= self.max_results {
                             break;
@@ -134,42 +134,51 @@ impl HighPerformanceFileSearch {
             .collect()
     }
 
-    /// Check if a file is a code file based on extension
+    /// Check if a file is a code file based on extension or filename
     fn is_code_file(&self, path: &Path) -> bool {
-        if let Some(ext) = path.extension().and_then(OsStr::to_str) {
-            return is_code_extension(ext);
+        // First, check the complete filename (handles files like .env, .env.local, .gitignore)
+        if let Some(filename) = path.file_name().and_then(OsStr::to_str) {
+            if is_code_filename(filename) {
+                return true;
+            }
         }
 
-        // Check for files without extensions (like Dockerfile, Makefile, etc.)
-        if let Some(filename) = path.file_name().and_then(OsStr::to_str) {
-            return is_code_filename(filename);
+        // Then check extension for regular files with extensions
+        if let Some(ext) = path.extension().and_then(OsStr::to_str) {
+            return is_code_extension(ext);
         }
 
         false
     }
 
-    /// Advanced filename matching with scoring
-    fn match_filename(
+    /// Advanced path matching with scoring
+    fn match_path(
         &self,
-        filename: &str,
+        relative_path: &str,
         full_path: &Path,
         keywords: &[String],
     ) -> Option<FileSearchResult> {
+        let path_lower = relative_path.to_lowercase();
+        let filename = full_path
+            .file_name()
+            .and_then(OsStr::to_str)
+            .unwrap_or("")
+            .to_string();
         let filename_lower = filename.to_lowercase();
 
-        // Check if all keywords match
+        // Check if all keywords match against the relative path
         if !keywords
             .iter()
-            .all(|keyword| self.keyword_matches(&filename_lower, keyword))
+            .all(|keyword| self.keyword_matches(&path_lower, keyword))
         {
             return None;
         }
 
         // Calculate match score
-        let score = self.calculate_match_score(&filename_lower, keywords);
+        let score = self.calculate_match_score(&path_lower, &filename_lower, keywords);
 
         Some(FileSearchResult {
-            name: filename.to_string(),
+            name: filename,
             path: full_path.to_string_lossy().to_string(),
             is_directory: false,
             score,
@@ -177,19 +186,25 @@ impl HighPerformanceFileSearch {
     }
 
     /// Check if a keyword matches using multiple strategies
-    fn keyword_matches(&self, filename: &str, keyword: &str) -> bool {
+    fn keyword_matches(&self, text: &str, keyword: &str) -> bool {
         // Direct substring match
-        if filename.contains(keyword) {
+        if text.contains(keyword) {
             return true;
         }
 
+        // For keywords starting with dot (hidden files, extensions),
+        // only use exact substring match, no fuzzy matching
+        if keyword.starts_with('.') {
+            return false;
+        }
+
         // Fuzzy match: check if keyword characters appear in order
-        self.fuzzy_match(filename, keyword)
+        self.fuzzy_match(text, keyword)
     }
 
-    /// Fuzzy matching: check if all characters of keyword appear in order in filename
-    fn fuzzy_match(&self, filename: &str, keyword: &str) -> bool {
-        let filename_chars: Vec<char> = filename.chars().collect();
+    /// Fuzzy matching: check if all characters of keyword appear in order in text
+    fn fuzzy_match(&self, text: &str, keyword: &str) -> bool {
+        let text_chars: Vec<char> = text.chars().collect();
         let keyword_chars: Vec<char> = keyword.chars().collect();
 
         if keyword_chars.is_empty() {
@@ -198,8 +213,8 @@ impl HighPerformanceFileSearch {
 
         let mut keyword_idx = 0;
 
-        for &file_char in &filename_chars {
-            if keyword_idx < keyword_chars.len() && file_char == keyword_chars[keyword_idx] {
+        for &c in &text_chars {
+            if keyword_idx < keyword_chars.len() && c == keyword_chars[keyword_idx] {
                 keyword_idx += 1;
             }
         }
@@ -208,76 +223,90 @@ impl HighPerformanceFileSearch {
     }
 
     /// Calculate match score for ranking results
-    fn calculate_match_score(&self, filename: &str, keywords: &[String]) -> f64 {
+    fn calculate_match_score(
+        &self,
+        path_lower: &str,
+        filename_lower: &str,
+        keywords: &[String],
+    ) -> f64 {
         if keywords.is_empty() {
             return 0.0;
         }
 
         let mut score = 0.0;
 
-        // Bonus for exact filename match
+        // Base score for matching all keywords
+        score += 100.0;
+
+        // Path matches vs Filename matches
         let combined_query = keywords.join("");
-        if filename == combined_query {
+        let combined_query_with_sep = keywords.join("/");
+
+        // HIGHEST PRIORITY: Exact filename match
+        if filename_lower == combined_query {
+            score += 2000.0;
+        }
+
+        // HIGH PRIORITY: Filename starts with query
+        if filename_lower.starts_with(&combined_query) {
             score += 1000.0;
         }
 
-        // Bonus for continuous substring matches
-        if filename.contains(&combined_query) {
+        // HIGH PRIORITY: Filename contains query
+        if filename_lower.contains(&combined_query) {
             score += 500.0;
         }
 
-        // Bonus for continuous match with separators
-        let separated_query = keywords.join("-");
-        if filename.contains(&separated_query) {
-            score += 400.0;
+        // Exact path match (relative)
+        if path_lower == combined_query || path_lower == combined_query_with_sep {
+            score += 800.0;
         }
 
-        let separated_query_underscore = keywords.join("_");
-        if filename.contains(&separated_query_underscore) {
-            score += 400.0;
-        }
-
-        let separated_query_dot = keywords.join(".");
-        if filename.contains(&separated_query_dot) {
+        // Path contains query as substring
+        if path_lower.contains(&combined_query) {
             score += 300.0;
         }
 
-        // Bonus for starts with first keyword
-        if let Some(first_keyword) = keywords.first() {
-            if filename.starts_with(first_keyword) {
-                score += 200.0;
-            }
+        // Path contains query with slashes
+        if path_lower.contains(&combined_query_with_sep) {
+            score += 400.0;
         }
 
-        // Bonus for all keywords in order (even with gaps)
-        if self.all_keywords_in_order(filename, keywords) {
-            score += 150.0;
+        // Bonus for all keywords in order (even with gaps) in filename
+        if self.all_keywords_in_order(filename_lower, keywords) {
+            score += 200.0;
+        }
+
+        // Bonus for all keywords in order in path
+        if self.all_keywords_in_order(path_lower, keywords) {
+            score += 100.0;
         }
 
         // Individual keyword bonuses
         for keyword in keywords {
-            // Exact word boundary match
-            if self.word_boundary_match(filename, keyword) {
-                score += 100.0;
+            // Filename word boundary match
+            if self.word_boundary_match(filename_lower, keyword) {
+                score += 80.0;
             }
-            // Substring match
-            else if filename.contains(keyword) {
-                score += 50.0;
+            // Filename substring match
+            else if filename_lower.contains(keyword) {
+                score += 40.0;
             }
-            // Fuzzy match (lowest bonus)
-            else if self.fuzzy_match(filename, keyword) {
-                score += 25.0;
+
+            // Path word boundary match
+            if self.word_boundary_match(path_lower, keyword) {
+                score += 40.0;
             }
         }
 
         // Penalty for length (shorter names rank higher)
-        score -= filename.len() as f64 * 0.1;
+        score -= path_lower.len() as f64 * 0.1;
 
         // Bonus for common file types
-        if filename.ends_with(".ts")
-            || filename.ends_with(".js")
-            || filename.ends_with(".tsx")
-            || filename.ends_with(".jsx")
+        if filename_lower.ends_with(".ts")
+            || filename_lower.ends_with(".js")
+            || filename_lower.ends_with(".tsx")
+            || filename_lower.ends_with(".jsx")
         {
             score += 10.0;
         }
@@ -407,5 +436,89 @@ jobs:
         let names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
         assert!(names.contains(&"release.yml"));
         assert!(names.contains(&"test.yml"));
+    }
+
+    #[test]
+    fn test_path_based_search() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+
+        // Create nested directory structure
+        fs::create_dir_all(root.join("docs/api")).unwrap();
+        fs::create_dir_all(root.join("src/components")).unwrap();
+
+        fs::write(root.join("docs/package.json"), "{}").unwrap();
+        fs::write(root.join("package.json"), "{}").unwrap();
+        fs::write(root.join("src/components/button.tsx"), "").unwrap();
+
+        let search = HighPerformanceFileSearch::new();
+
+        // 1. Search for "docs/package.json"
+        let results = search
+            .search_files(root.to_str().unwrap(), "docs/package.json")
+            .unwrap();
+
+        assert!(!results.is_empty(), "Should find docs/package.json");
+        assert_eq!(results[0].name, "package.json");
+        assert!(
+            results[0].path.contains("docs/package.json")
+                || results[0].path.contains("docs\\package.json"),
+            "First result should be docs/package.json"
+        );
+
+        // 2. Search for "comp/butt" (partial path)
+        let results = search
+            .search_files(root.to_str().unwrap(), "comp/butt")
+            .unwrap();
+        assert!(!results.is_empty(), "Should find src/components/button.tsx");
+        assert_eq!(results[0].name, "button.tsx");
+
+        // 3. Search for "package.json" (should find both, but root one might rank higher depending on length penalty)
+        let results = search
+            .search_files(root.to_str().unwrap(), "package.json")
+            .unwrap();
+        assert!(results.len() >= 2);
+    }
+
+    #[test]
+    fn test_dotfile_search_no_fuzzy_match() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = temp_dir.path();
+
+        // Create files with and without .env in the name
+        fs::write(root.join(".env"), "SECRET=value").unwrap();
+        fs::write(root.join(".env.local"), "SECRET=local").unwrap();
+        fs::create_dir_all(root.join("src/locales")).unwrap();
+        fs::write(root.join("src/locales/sv_SE.js"), "export default {}").unwrap();
+        fs::write(root.join("src/locales/lv_LV.js"), "export default {}").unwrap();
+        fs::write(root.join("src/environment.ts"), "export const env = {}").unwrap();
+
+        let search = HighPerformanceFileSearch::new();
+
+        // Search for ".env" - should only find files with ".env" substring
+        let results = search.search_files(root.to_str().unwrap(), ".env").unwrap();
+
+        // Should only find .env and .env.local, NOT sv_SE.js or lv_LV.js
+        assert!(
+            results.len() == 2,
+            "Should find exactly 2 files (.env and .env.local), found {}: {:?}",
+            results.len(),
+            results.iter().map(|r| &r.name).collect::<Vec<_>>()
+        );
+
+        // Verify all results contain ".env" in the filename
+        for result in &results {
+            assert!(
+                result.name.contains(".env"),
+                "Result '{}' should contain '.env'",
+                result.name
+            );
+        }
+
+        // Verify sv_SE.js and lv_LV.js are NOT in results
+        let result_names: Vec<&str> = results.iter().map(|r| r.name.as_str()).collect();
+        assert!(!result_names.contains(&"sv_SE.js"));
+        assert!(!result_names.contains(&"lv_LV.js"));
+        assert!(!result_names.contains(&"environment.ts"));
     }
 }

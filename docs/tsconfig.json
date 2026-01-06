@@ -17,7 +17,9 @@
     "incremental": true,
     "paths": {
       "@/*": ["./*"],
-      "@/.source": [".source"]
+      "@/.source": [".source"],
+      "@talkcody/shared": ["../packages/shared/src/index.ts"],
+      "@talkcody/shared/*": ["../packages/shared/src/*"]
     },
     "plugins": [
       {

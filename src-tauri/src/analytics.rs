@@ -1,3 +1,4 @@
+use crate::device_id::get_or_create_device_id;
 use reqwest::Client;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
@@ -51,29 +52,6 @@ struct AnalyticsPayload {
     os_version: Option<String>,
     #[serde(rename = "appVersion", skip_serializing_if = "Option::is_none")]
     app_version: Option<String>,
-}
-
-/// Get or create device ID (stored in app data directory)
-fn get_or_create_device_id(app_data_dir: &std::path::Path) -> String {
-    let device_id_path = app_data_dir.join("device_id");
-
-    // Try to read existing device ID
-    if let Ok(id) = std::fs::read_to_string(&device_id_path) {
-        let id = id.trim().to_string();
-        if !id.is_empty() {
-            return id;
-        }
-    }
-
-    // Generate new device ID
-    let new_id = uuid::Uuid::new_v4().to_string();
-
-    // Save it
-    if let Err(e) = std::fs::write(&device_id_path, &new_id) {
-        log::error!("Failed to save device_id: {}", e);
-    }
-
-    new_id
 }
 
 /// Get OS name

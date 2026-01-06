@@ -74,6 +74,7 @@ describe('handleExternalFileChange', () => {
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 
@@ -119,8 +120,8 @@ describe('handleExternalFileChange', () => {
     // Mock disk content to be different
     vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('new content from disk');
 
-    // Wait for recent save timeout to expire
-    vi.advanceTimersByTime(1100);
+    // Wait for recent save timeout to expire (2000ms + 100ms buffer)
+    vi.advanceTimersByTime(2100);
 
     // Trigger external file change
     await result.current.handleExternalFileChange(testFilePath);
@@ -147,8 +148,8 @@ describe('handleExternalFileChange', () => {
     // Mock disk content to be different
     vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('external content');
 
-    // Wait for recent save timeout to expire
-    vi.advanceTimersByTime(1100);
+    // Wait for recent save timeout to expire (2000ms + 100ms buffer)
+    vi.advanceTimersByTime(2100);
 
     // Trigger external file change
     await result.current.handleExternalFileChange(testFilePath);
@@ -178,8 +179,8 @@ describe('handleExternalFileChange', () => {
     // Mock disk content to be the same
     vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('same content');
 
-    // Wait for recent save timeout to expire
-    vi.advanceTimersByTime(1100);
+    // Wait for recent save timeout to expire (2000ms + 100ms buffer)
+    vi.advanceTimersByTime(2100);
 
     // Trigger external file change
     await result.current.handleExternalFileChange(testFilePath);
@@ -209,8 +210,8 @@ describe('handleExternalFileChange', () => {
     // Then trigger external file change
     vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('disk content');
 
-    // Wait for recent save timeout to expire
-    vi.advanceTimersByTime(1100);
+    // Wait for recent save timeout to expire (2000ms + 100ms buffer)
+    vi.advanceTimersByTime(2100);
 
     // Trigger external file change with unsaved content
     await result.current.handleExternalFileChange(testFilePath);
@@ -249,8 +250,8 @@ describe('handleExternalFileChange', () => {
     // Then trigger external file change
     vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('disk content');
 
-    // Wait for recent save timeout to expire
-    vi.advanceTimersByTime(1100);
+    // Wait for recent save timeout to expire (2000ms + 100ms buffer)
+    vi.advanceTimersByTime(2100);
 
     // Trigger external file change
     await result.current.handleExternalFileChange(testFilePath);
@@ -271,5 +272,40 @@ describe('handleExternalFileChange', () => {
     expect(openFile?.content).toBe('local content');
     expect(openFile?.hasUnsavedChanges).toBe(true);
     expect(result.current.pendingExternalChange).toBeNull();
+  });
+
+  it('should mark file as recently saved when using markRecentSave', async () => {
+    const { repositoryService } = await import('@/services/repository-service');
+
+    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
+
+    // Add file to openFiles
+    vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('initial content');
+    await result.current.selectFile(testFilePath);
+
+    // Mark file as recently saved
+    result.current.markRecentSave(testFilePath);
+
+    // Mock disk content to be different
+    vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('new disk content');
+
+    // Immediately trigger external file change (within the 1s window)
+    await result.current.handleExternalFileChange(testFilePath);
+
+    // Should NOT trigger external change dialog or update content
+    // because file is marked as recently saved
+    expect(result.current.pendingExternalChange).toBeNull();
+    const openFile = result.current.openFiles.find((f) => f.path === testFilePath);
+    expect(openFile?.content).toBe('initial content');
+
+    // Wait for recent save timeout to expire (2000ms + 100ms buffer)
+    vi.advanceTimersByTime(2100);
+
+    // Now trigger external file change again
+    await result.current.handleExternalFileChange(testFilePath);
+
+    // Now it should update the content (no unsaved changes)
+    const updatedFile = result.current.openFiles.find((f) => f.path === testFilePath);
+    expect(updatedFile?.content).toBe('new disk content');
   });
 });

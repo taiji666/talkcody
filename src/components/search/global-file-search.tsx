@@ -51,12 +51,11 @@ export function GlobalFileSearch({
   const listRef = useRef<HTMLDivElement>(null);
 
   // Parse query into keywords for display purposes only
-  // (Rust backend now handles all parsing and matching)
   const keywords = useMemo(() => {
     return query
       .trim()
       .toLowerCase()
-      .split(/\s+/)
+      .split(/[\s/]+/) // Split by whitespace or forward slash
       .filter((keyword) => keyword.length > 0);
   }, [query]);
 

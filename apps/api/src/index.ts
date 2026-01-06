@@ -14,6 +14,8 @@ import authRoutes from './routes/auth';
 import marketplaceRoutes from './routes/marketplace';
 import modelsRoutes from './routes/models';
 import remoteSkillsRoutes from './routes/remote-skills';
+import searchRoutes from './routes/search';
+import shareRoutes from './routes/shares';
 import skillRoutes from './routes/skills';
 import skillsMarketplaceRoutes from './routes/skills-marketplace';
 import talkcodyProviderRoutes from './routes/talkcody-provider';
@@ -45,7 +47,7 @@ app.use(
     origin: corsOrigins,
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Device-ID'],
     exposeHeaders: ['X-TalkCody-Remaining-Tokens'],
   })
 );
@@ -97,6 +99,8 @@ app.route('/api/remote-skills', remoteSkillsRoutes);
 app.route('/api/updates', updatesRoutes);
 app.route('/api/analytics', analyticsRoutes);
 app.route('/api/talkcody', talkcodyProviderRoutes);
+app.route('/api/search', searchRoutes);
+app.route('/api/shares', shareRoutes);
 
 // 404 handler
 app.notFound((c) => {
@@ -109,6 +113,30 @@ app.onError(errorHandler);
 // Conditional export based on runtime environment
 // Check if we're running in Bun (local dev) or Cloudflare Workers
 const isBunRuntime = typeof Bun !== 'undefined';
+
+// Scheduled handler for cron triggers (Cloudflare Workers only)
+export async function scheduled(
+  event: ScheduledEvent,
+  env: HonoContext['env'],
+  _ctx: ExecutionContext
+) {
+  console.log('[Cron] Running scheduled task:', event.cron);
+
+  try {
+    // Initialize database
+    const { getDb } = await import('./db/client');
+    const { db } = getDb(env);
+
+    // Import and run cleanup
+    const { ShareService } = await import('./services/share-service');
+    const shareService = new ShareService(db);
+    const deletedCount = await shareService.cleanupExpiredShares();
+
+    console.log(`[Cron] Cleaned up ${deletedCount} expired shares`);
+  } catch (error) {
+    console.error('[Cron] Failed to run cleanup:', error);
+  }
+}
 
 // Export for Cloudflare Workers (when Bun is not available)
 // Export for Bun runtime (when Bun is available)

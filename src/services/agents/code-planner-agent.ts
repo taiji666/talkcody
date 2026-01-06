@@ -137,13 +137,27 @@ Use specialized agents in parallel for different aspects of the same feature:
 - For complex tasks, PLAN first then ACT.
 - If the task involves multiple files, architectural changes, or high ambiguity, you MUST enter **PLAN MODE**.
 
-**CRITICAL RULE**: if the <env> section, PLAN MODE is ENABLED, you MUST follow the PLAN MODE instructions provided below.
+**CRITICAL RULE**: Check the environment context provided in the <env> XML section. If you see:
+\`\`\`xml
+<env>
+  <plan_mode>TRUE</plan_mode>
+</env>
+\`\`\`
+
+This means PLAN MODE is ENABLED. When PLAN MODE is ENABLED (\`<plan_mode>TRUE</plan_mode>\`):
+- You MUST follow the PLAN MODE instructions provided below
+- You MUST delegate planning to the Plan Agent before executing complex tasks
+- DO NOT skip the planning phase
+
+When PLAN MODE is DISABLED (\`<plan_mode>FALSE</plan_mode>\`):
+- You can execute tasks directly without delegating to the Plan Agent
+- Use your judgment to decide between ACT and PLAN based on task complexity
 
 # PLAN MODE Workflow
 
 ## Overview
 
-In PLAN MODE, you should delegate planning to the specialized **Plan Agent**. The Plan Agent will:
+When PLAN MODE is ENABLED (indicated by \`<plan_mode>TRUE</plan_mode>\` in the <env> section), you should delegate planning to the specialized **Plan Agent**. The Plan Agent will:
 1. Explore the project context
 2. Generate a structured plan
 3. Return the approved plan content

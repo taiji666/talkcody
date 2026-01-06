@@ -50,15 +50,17 @@ impl HighPerformanceGlob {
         // Use sequential file collection with ignore crate for simplicity and correctness
         let mut walker_builder = WalkBuilder::new(root_path);
 
+        // Configure walker to include hidden directories like .talkcody
+        // Disable standard_filters to allow traversal of hidden directories
+        // standard_filters(false) disables the default behavior that skips hidden files/dirs
         walker_builder
-            .hidden(true)
-            .git_ignore(true)
-            .git_global(true)
-            .git_exclude(true)
-            .ignore(true)
+            .standard_filters(false)
             .parents(true)
             .max_depth(Some(20))
             .filter_entry(|entry| {
+                // Exclude common directories that should be skipped (node_modules, .git, etc.)
+                // Note: We don't exclude hidden directories here because users may want to
+                // search within hidden directories like .talkcody, .cursor, etc.
                 if entry.path().is_dir() {
                     if let Some(name) = entry.path().file_name().and_then(OsStr::to_str) {
                         return !should_exclude_dir(name);
@@ -563,5 +565,87 @@ mod tests {
         assert!(glob.simple_glob_match("test_file.ts", "test*.ts"));
         assert!(glob.simple_glob_match("test.ts", "test*.ts"));
         assert!(glob.simple_glob_match("testABC.ts", "test*.ts"));
+    }
+
+    #[test]
+    fn test_hidden_directory_files() {
+        // Test that files in hidden directories (like .talkcody) can be found
+        let temp_dir = tempfile::TempDir::new().unwrap();
+
+        // Create a hidden directory structure similar to .talkcody
+        fs::create_dir_all(temp_dir.path().join(".talkcody/plan/subdir")).unwrap();
+        fs::write(
+            temp_dir.path().join(".talkcody/plan/plan_2024-01-01.md"),
+            "plan content",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.path().join(".talkcody/plan/subdir/nested.md"),
+            "nested content",
+        )
+        .unwrap();
+
+        // Create regular files for comparison
+        fs::write(temp_dir.path().join("visible.md"), "visible content").unwrap();
+
+        let glob = HighPerformanceGlob::new();
+
+        // Test searching for files in hidden directory
+        let results = glob
+            .search_files_by_glob("**/*.md", temp_dir.path().to_str().unwrap(), 1000)
+            .unwrap();
+
+        // Should find files in both hidden and visible directories
+        let paths: Vec<String> = results.iter().map(|r| r.path.clone()).collect();
+
+        assert!(!paths.is_empty(), "Should find at least some md files");
+
+        // Check that files in .talkcody are included
+        let has_hidden_file = paths.iter().any(|p| p.contains(".talkcody"));
+        assert!(
+            has_hidden_file,
+            "Should find files in .talkcody directory. Paths: {:?}",
+            paths
+        );
+
+        // Check that visible file is also found
+        let has_visible_file = paths.iter().any(|p| p.contains("visible.md"));
+        assert!(
+            has_visible_file,
+            "Should also find visible files. Paths: {:?}",
+            paths
+        );
+    }
+
+    #[test]
+    fn test_search_specific_hidden_file() {
+        // Test searching for a specific file in a hidden directory
+        let temp_dir = tempfile::TempDir::new().unwrap();
+
+        // Create .talkcody directory with a plan file
+        fs::create_dir_all(temp_dir.path().join(".talkcody/plan")).unwrap();
+        fs::write(
+            temp_dir.path().join(".talkcody/plan/plan_2024-01-01.md"),
+            "plan content",
+        )
+        .unwrap();
+
+        let glob = HighPerformanceGlob::new();
+
+        // Search for the specific plan file
+        let results = glob
+            .search_files_by_glob(
+                ".talkcody/plan/*.md",
+                temp_dir.path().to_str().unwrap(),
+                1000,
+            )
+            .unwrap();
+
+        assert_eq!(results.len(), 1, "Should find exactly one file");
+        assert!(
+            results[0].path.contains("plan_2024-01-01.md"),
+            "Should find the plan file. Found: {}",
+            results[0].path
+        );
     }
 }

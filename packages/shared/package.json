@@ -1,6 +1,6 @@
 {
   "name": "@talkcody/shared",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "description": "Shared types and utilities for TalkCody",
   "main": "./src/index.ts",
@@ -12,7 +12,9 @@
     "./types/user": "./src/types/user.ts",
     "./types/marketplace": "./src/types/marketplace.ts",
     "./types/api": "./src/types/api.ts",
-    "./data/models-config": "./src/data/models-config.json"
+    "./types/share-tools": "./src/types/share-tools.ts",
+    "./data/models-config": "./src/data/models-config.json",
+    "./utils": "./src/utils/index.ts"
   },
   "scripts": {
     "type-check": "bun run tsc --noEmit"

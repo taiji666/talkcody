@@ -13,6 +13,11 @@ NODE_ENV = "production"
 enabled = true
 head_sampling_rate = 1 # optional. default = 1.
 
+# Cron Triggers
+# Daily cleanup of expired shares at 2 AM UTC
+[triggers]
+crons = ["0 2 * * *"]
+
 # R2 Buckets
 [[r2_buckets]]
 binding = "RELEASES_BUCKET"

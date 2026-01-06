@@ -12,6 +12,7 @@ vi.mock('@/stores/window-scoped-repository-store', () => ({
   useRepositoryStore: vi.fn((selector) =>
     selector({
       updateFileContent: vi.fn(),
+      markRecentSave: vi.fn(),
     })
   ),
 }));

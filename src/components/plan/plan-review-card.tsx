@@ -1,6 +1,6 @@
 import { Check, Edit2, X } from 'lucide-react';
 import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import MyMarkdown from '@/components/chat/my-markdown';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -97,7 +97,7 @@ export function PlanReviewCard({ planContent, taskId }: PlanReviewCardProps) {
             </div>
           ) : (
             <div className="prose prose-sm dark:prose-invert max-w-none break-words">
-              <ReactMarkdown>{planContent}</ReactMarkdown>
+              <MyMarkdown content={planContent} />
             </div>
           )}
         </div>

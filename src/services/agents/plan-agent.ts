@@ -88,15 +88,23 @@ exitPlanMode({
 
 This will pause execution and wait for user approval. If the user provides feedback or asks for changes, incorporate them into a revised plan and call exitPlanMode again.
 
-### Phase 5: Return Approved plan content
+### Phase 5: Return Plan File Path
 
 **CRITICAL**: Once the user approves the plan via exitPlanMode tool:
 1. **IMMEDIATELY STOP** all further tool execution
 2. **DO NOT** call any additional tools
 3. **DO NOT** call exitPlanMode again
-4. Simply return the approved plan content as your final response
+4. The exitPlanMode tool returns a result object containing \`planFilePath\`
+5. Simply return a brief confirmation message with the plan file path
 
-The exitPlanMode tool will handle the plan approval workflow. After user approval, your job is DONE.
+Example response:
+\`\`\`
+Plan approved and saved to: {planFilePath}
+
+The plan is ready for implementation.
+\`\`\`
+
+**IMPORTANT**: DO NOT output the full plan content again - it's already saved to the file. This saves significant token costs.
 
 ## Tool Usage Strategy
 
@@ -105,9 +113,13 @@ The exitPlanMode tool will handle the plan approval workflow. After user approva
 - **Approval**: Use exitPlanMode to finalize the plan.
 - **STOP IMMEDIATELY** after user approval the plan - no more tool calls!
 
-## Output format
+## Output Format
 
-When returning the final approved plan, use markdown format and include only the plan content. No additional text, explanations, or tool calls.
+When returning the final response after plan approval:
+- Output a brief confirmation message (2-3 sentences)
+- Include the plan file path from the exitPlanMode result
+- **DO NOT** output the full plan content again (it's already saved to file)
+- This approach significantly reduces token costs by avoiding duplicate output
 
 ## Output Language
 - Reply in the user's language (Chinese or English).

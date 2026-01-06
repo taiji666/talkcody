@@ -4,6 +4,7 @@ mod background_tasks;
 mod code_navigation;
 mod constants;
 mod database;
+mod device_id;
 mod directory_tree;
 mod dock_menu;
 mod file_search;
@@ -796,6 +797,7 @@ pub fn run() {
             lsp::lsp_get_server_status,
             lsp::lsp_download_server,
             oauth_callback_server::start_oauth_callback_server,
+            device_id::get_device_id,
         ])
         .on_window_event(|window, event| {
             // Clean up resources when main window is destroyed

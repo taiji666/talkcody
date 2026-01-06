@@ -101,3 +101,5 @@ docs/.vercel/
 
 # TalkCody task outputs (large output files from tool execution)
 .talkcody/
+.vercel
+.env*.local

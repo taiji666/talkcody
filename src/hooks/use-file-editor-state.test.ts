@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 
 const mockUpdateFileContent = vi.fn();
+const mockMarkRecentSave = vi.fn();
 
 vi.mock('@/services/repository-service', () => ({
   repositoryService: {
@@ -12,6 +13,7 @@ vi.mock('@/stores/window-scoped-repository-store', () => ({
   useRepositoryStore: vi.fn((selector) =>
     selector({
       updateFileContent: mockUpdateFileContent,
+      markRecentSave: mockMarkRecentSave,
     })
   ),
 }));
@@ -143,5 +145,80 @@ describe('useFileEditorState', () => {
     // 3. Verify both writeFile and updateFileContent were called
     expect(repositoryService.writeFile).toHaveBeenCalledWith('manual-save.txt', 'manually saved content');
     expect(mockUpdateFileContent).toHaveBeenCalledWith('manual-save.txt', 'manually saved content');
+  });
+
+  it('should mark file as recently saved during auto-save to prevent false external change detection', async () => {
+    const onFileSaved = vi.fn();
+    const { result } = renderHook(
+      ({ filePath, fileContent }) =>
+        useFileEditorState({
+          filePath,
+          fileContent,
+          onFileSaved,
+        }),
+      {
+        initialProps: {
+          filePath: 'auto-save.txt',
+          fileContent: 'original content',
+        },
+      }
+    );
+
+    // 1. Modify the file content to trigger auto-save
+    act(() => {
+      result.current.handleContentChange('auto-saved content');
+    });
+
+    // 2. Advance timers to trigger auto-save
+    await act(async () => {
+      vi.advanceTimersByTime(2000); // AUTO_SAVE_DELAY
+    });
+
+    // Wait for any pending promises
+    await Promise.resolve();
+
+    // 3. Verify markRecentSave was called BEFORE writeFile
+    // This prevents the file watcher from treating the auto-save as an external change
+    expect(mockMarkRecentSave).toHaveBeenCalledWith('auto-save.txt');
+    expect(repositoryService.writeFile).toHaveBeenCalledWith('auto-save.txt', 'auto-saved content');
+    
+    // Verify call order: markRecentSave should be called before writeFile
+    const markRecentSaveCallOrder = mockMarkRecentSave.mock.invocationCallOrder[0];
+    const writeFileCallOrder = (repositoryService.writeFile as any).mock.invocationCallOrder[0];
+    expect(markRecentSaveCallOrder).toBeLessThan(writeFileCallOrder);
+  });
+
+  it('should mark file as recently saved during manual save to prevent false external change detection', async () => {
+    const { result } = renderHook(
+      ({ filePath, fileContent }) =>
+        useFileEditorState({
+          filePath,
+          fileContent,
+        }),
+      {
+        initialProps: {
+          filePath: 'manual-save.txt',
+          fileContent: 'initial content',
+        },
+      }
+    );
+
+    // Clear previous calls
+    mockMarkRecentSave.mockClear();
+    vi.mocked(repositoryService.writeFile).mockClear();
+
+    // 1. Manually trigger save
+    await act(async () => {
+      await result.current.saveFileInternal('manual-save.txt', 'manually saved content');
+    });
+
+    // 2. Verify markRecentSave was called BEFORE writeFile
+    expect(mockMarkRecentSave).toHaveBeenCalledWith('manual-save.txt');
+    expect(repositoryService.writeFile).toHaveBeenCalledWith('manual-save.txt', 'manually saved content');
+    
+    // Verify call order: markRecentSave should be called before writeFile
+    const markRecentSaveCallOrder = mockMarkRecentSave.mock.invocationCallOrder[0];
+    const writeFileCallOrder = (repositoryService.writeFile as any).mock.invocationCallOrder[0];
+    expect(markRecentSaveCallOrder).toBeLessThan(writeFileCallOrder);
   });
 });

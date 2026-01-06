@@ -174,4 +174,5 @@ When generating code, consider:
 - Try to avoid using dynamic imports
 - User-visible messages and text need to support both English and Chinese.
 - Platform-related functions must be able to work simultaneously on macOS, Windows, and Linux platforms.
+- when need fetch, use `simpleFetch` from `@/lib/tauri-fetch`, not `fetch`.
 - When adding test cases, you should minimize mocking as much as possible.

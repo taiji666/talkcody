@@ -21,6 +21,7 @@ import { useGlobalFileSearch } from '@/hooks/use-global-file-search';
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts';
 import { useTranslation } from '@/hooks/use-locale';
 import { useRepositoryWatcher } from '@/hooks/use-repository-watcher';
+import { useTask } from '@/hooks/use-task';
 import { useTasks } from '@/hooks/use-tasks';
 import { useWorktreeConflict } from '@/hooks/use-worktree-conflict';
 import { logger } from '@/lib/logger';
@@ -163,6 +164,9 @@ export function RepositoryLayout() {
     startNewChat,
     loadTasks,
   } = useTasks();
+
+  // Get current task and messages for sharing
+  const { task: currentTask, messages: currentMessages } = useTask(currentTaskId);
 
   // Task History state
   const runningTaskIds = useExecutionStore(useShallow((state) => state.getRunningTaskIds()));
@@ -839,6 +843,8 @@ export function RepositoryLayout() {
                   {/* Chat Panel Header - always show */}
                   <ChatPanelHeader
                     currentTaskId={currentTaskId}
+                    currentTask={currentTask}
+                    messages={currentMessages}
                     isHistoryOpen={isHistoryOpen}
                     onHistoryOpenChange={setIsHistoryOpen}
                     onTaskSelect={handleHistoryTaskSelect}

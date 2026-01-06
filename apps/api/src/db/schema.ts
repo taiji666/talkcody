@@ -665,3 +665,64 @@ export const providerUsage = sqliteTable(
     dateIdx: index('provider_usage_date_idx').on(table.usageDate),
   })
 );
+
+// ==================== Search Usage Table ====================
+// Tracks search usage for rate limiting (by device ID and optional user ID)
+export const searchUsage = sqliteTable(
+  'search_usage',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    deviceId: text('device_id', { length: 255 }).notNull(),
+    userId: text('user_id', { length: 255 }),
+    searchCount: integer('search_count').default(1).notNull(),
+    usageDate: text('usage_date', { length: 10 }).notNull(), // YYYY-MM-DD format
+    createdAt: integer('created_at')
+      .notNull()
+      .$defaultFn(() => Date.now()),
+    updatedAt: integer('updated_at')
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (table) => ({
+    deviceDateIdx: index('search_usage_device_date_idx').on(table.deviceId, table.usageDate),
+    userDateIdx: index('search_usage_user_date_idx').on(table.userId, table.usageDate),
+    dateIdx: index('search_usage_date_idx').on(table.usageDate),
+  })
+);
+
+// ==================== Task Shares Table ====================
+// Stores shared task snapshots for public viewing
+export const taskShares = sqliteTable(
+  'task_shares',
+  {
+    id: text('id').primaryKey(), // nanoid generated short ID
+    taskId: text('task_id', { length: 255 }).notNull(),
+    userId: text('user_id', { length: 255 }), // Optional: creator's user ID
+    taskTitle: text('task_title', { length: 500 }).notNull(),
+    messagesJson: text('messages_json').notNull(), // JSON string of messages
+    storageUrl: text('storage_url'), // R2 URL for large shares
+    model: text('model', { length: 100 }),
+    passwordHash: text('password_hash'), // SHA-256 hash
+    expiresAt: integer('expires_at'), // Unix timestamp in milliseconds
+    viewCount: integer('view_count').default(0).notNull(),
+    isPublic: integer('is_public', { mode: 'boolean' }).default(true).notNull(),
+    metadata: text('metadata', { mode: 'json' }).$type<{
+      talkcodyVersion?: string;
+      platform?: string;
+      sharedAt?: number;
+    }>(),
+    createdAt: integer('created_at')
+      .notNull()
+      .$defaultFn(() => Date.now()),
+    createdBy: text('created_by', { length: 255 }), // Device ID
+  },
+  (table) => ({
+    taskIdIdx: index('shares_task_id_idx').on(table.taskId),
+    userIdIdx: index('shares_user_id_idx').on(table.userId),
+    expiresAtIdx: index('shares_expires_at_idx').on(table.expiresAt),
+    createdAtIdx: index('shares_created_at_idx').on(table.createdAt),
+    isPublicIdx: index('shares_is_public_idx').on(table.isPublic),
+  })
+);

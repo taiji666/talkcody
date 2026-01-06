@@ -191,7 +191,7 @@ export function FileChangesSummary({ taskId, onSendMessage }: FileChangesSummary
 
   return (
     <>
-      <Card className="mx-4 mb-2 gap-2 py-2">
+      <Card className="mx-4 mb-2 gap-2 py-2 max-h-96">
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           <CardHeader className="flex items-center px-3 py-0">
             <CollapsibleTrigger className="w-full hover:opacity-80 transition-opacity">
@@ -273,7 +273,7 @@ export function FileChangesSummary({ taskId, onSendMessage }: FileChangesSummary
             </CollapsibleTrigger>
           </CardHeader>
 
-          <CollapsibleContent>
+          <CollapsibleContent className="overflow-y-auto">
             <CardContent className="space-y-2 px-3">
               {newFiles.length > 0 && (
                 <div>

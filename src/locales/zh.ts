@@ -1640,6 +1640,28 @@ const zh: LocaleDefinition = {
     },
   },
 
+  Share: {
+    title: '分享任务',
+    description: '创建一个可分享的任务链接。',
+    messages: '条消息',
+    emptyTask: '没有可分享的消息',
+    created: '分享链接已创建',
+    failed: '创建分享链接失败',
+    copyFailed: '复制链接失败',
+    expiresIn: '过期时间',
+    expires1d: '1 天',
+    expires7d: '7 天',
+    expires30d: '30 天',
+    expiresNever: '永不过期',
+    passwordProtection: '密码保护',
+    passwordPlaceholder: '输入密码',
+    privacyNotice: '文件路径和敏感数据将被自动脱敏处理。',
+    copyLink: '复制链接',
+    openInBrowser: '在浏览器中打开',
+    passwordSet: '此分享已设置密码保护。',
+    createLink: '创建链接',
+  },
+
   minimaxUsage: {
     title: 'MiniMax Coding Plan 使用情况',
     description: '监控您的 MiniMax Coding Plan 使用情况',

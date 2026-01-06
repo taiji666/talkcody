@@ -4,6 +4,7 @@ import { ExaSearch, isExaMCPAvailable } from './exa-search';
 import { GLMSearch, isGLMMCPAvailable } from './glm-search';
 import { isMiniMaxMCPAvailable, MiniMaxSearch } from './minimax-search';
 import { SerperSearch } from './serper-search';
+import { isTalkCodySearchAvailable, TalkCodySearch } from './talkcody-search';
 import { TavilySearch } from './tavily-search';
 import type { WebSearchResult } from './types';
 
@@ -11,15 +12,19 @@ export { ExaSearch } from './exa-search';
 export { GLMSearch } from './glm-search';
 export { MiniMaxSearch } from './minimax-search';
 export { SerperSearch } from './serper-search';
+export { TalkCodySearch } from './talkcody-search';
 export { TavilySearch } from './tavily-search';
 // Re-export types and classes
 export type { SearchOptions, WebSearchResult, WebSearchSource } from './types';
 
 /**
  * Unified web search function with fallback providers
- * Priority: Tavily → Serper → MiniMax Coding Plan → GLM Coding Plan → Exa (free)
+ * Priority: TalkCody Internal (free) → Tavily → Serper → MiniMax Coding Plan → GLM Coding Plan → Exa (free)
  */
 export async function webSearch(query: string): Promise<WebSearchResult[]> {
+  // Check TalkCody internal search availability (always true, API handles rate limiting)
+  const talkCodyAvailable = isTalkCodySearchAvailable();
+
   const apiKeys = await settingsManager.getApiKeys();
   const hasTavilyKey = !!apiKeys.tavily;
   const hasSerperKey = !!apiKeys.serper;
@@ -38,6 +43,7 @@ export async function webSearch(query: string): Promise<WebSearchResult[]> {
   const glmAvailable = isGLMMCPAvailable();
 
   logger.info('Web Search - Available Providers', {
+    talkCodyAvailable,
     exaAvailable,
     hasTavilyKey,
     hasSerperKey,
@@ -48,6 +54,27 @@ export async function webSearch(query: string): Promise<WebSearchResult[]> {
     zhipuCodingPlanEnabled,
     glmAvailable,
   });
+
+  // Priority 0: TalkCody Internal Search (free with rate limits)
+  if (talkCodyAvailable) {
+    try {
+      logger.info('Using TalkCody Internal Search (free with rate limits)');
+      const talkCodySearch = new TalkCodySearch();
+      const results = await talkCodySearch.search(query);
+
+      if (results.length > 0) {
+        logger.info('TalkCody search results count:', results.length);
+        return results;
+      }
+      logger.warn('TalkCody search returned empty results, trying next provider');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('rate limit')) {
+        logger.warn('TalkCody search rate limit exceeded, trying next provider');
+      } else {
+        logger.warn('TalkCody search failed, trying next provider:', error);
+      }
+    }
+  }
 
   // Priority 1: Tavily Search (if API key configured)
   if (hasTavilyKey) {

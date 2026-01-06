@@ -21,8 +21,9 @@ export function useFileEditorState({
   currentAICompletion,
   onContentChange,
 }: UseFileEditorStateProps) {
-  // Get store method to sync content after save
+  // Get store methods to sync content and mark recent saves
   const updateFileContent = useRepositoryStore((state) => state.updateFileContent);
+  const markRecentSave = useRepositoryStore((state) => state.markRecentSave);
 
   const [currentContent, setCurrentContent] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -51,6 +52,9 @@ export function useFileEditorState({
 
       setIsSaving(true);
       try {
+        // Mark this file as recently saved BEFORE writing to avoid race condition
+        markRecentSave(filePathToSave);
+
         await repositoryService.writeFile(filePathToSave, content);
 
         // Sync content to openFiles store to prevent file watcher from treating it as external change
@@ -70,7 +74,7 @@ export function useFileEditorState({
         setIsSaving(false);
       }
     },
-    [filePath, onFileSaved, isSaving, updateFileContent]
+    [filePath, onFileSaved, isSaving, updateFileContent, markRecentSave]
   );
 
   const scheduleAutoSave = useCallback(

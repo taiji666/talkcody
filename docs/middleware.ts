@@ -11,6 +11,7 @@ export default createI18nMiddleware({
 });
 
 export const config = {
-  // Matcher ignoring `/_next/`, `/api/`, and static assets
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|logo.svg).*)"],
+  // Matcher ignoring `/_next/`, `/api/`, `/share/`, and static assets
+  // Exclude /share/ route from i18n middleware
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|logo.svg|share/).*)"],
 };

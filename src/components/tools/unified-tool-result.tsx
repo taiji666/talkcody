@@ -1,3 +1,4 @@
+import { formatToolInputSummary as sharedFormatToolInputSummary } from '@talkcody/shared/utils';
 import { Check, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -6,12 +7,6 @@ import { useFileChangesStore } from '@/stores/file-changes-store';
 import { useRepositoryStore } from '@/stores/window-scoped-repository-store';
 import { EditFileResult } from './edit-file-result';
 import { WriteFileResult } from './write-file-result';
-
-interface TodoItem {
-  id: string;
-  content: string;
-  status: 'pending' | 'in_progress' | 'completed';
-}
 
 interface UnifiedToolResultProps {
   toolName: string;
@@ -25,6 +20,7 @@ interface UnifiedToolResultProps {
 
 /**
  * Format tool input for display summary
+ * Desktop wrapper that adds relative path conversion for file tools
  * Exported for use in persisting tool messages
  */
 export function formatToolInputSummary(
@@ -38,59 +34,25 @@ export function formatToolInputSummary(
   if (!input) return '';
   const { rootPath, output } = options || {};
 
-  if (toolName === 'codeSearch') {
-    return `${input.pattern} in ${input.path}`;
-  }
-  if (toolName === 'exitPlanMode') {
-    return (output as { action?: string })?.action ?? '';
-  }
-  if (toolName === 'listFiles') {
-    return `${input.directory_path}`;
-  }
-  if (toolName === 'todoWrite' && Array.isArray(input.todos)) {
-    const inProgressTodo = (input.todos as TodoItem[]).find(
-      (todo) => todo.status === 'in_progress'
-    );
-    if (inProgressTodo?.content) {
-      return `"${inProgressTodo.content}" doing`;
-    }
-    return `Updating ${input.todos.length} todo(s)`;
+  // For file tools, convert absolute paths to relative paths
+  let processedInput = input;
+  if (
+    rootPath &&
+    input.file_path &&
+    typeof input.file_path === 'string' &&
+    (toolName === 'readFile' || toolName === 'writeFile' || toolName === 'editFile')
+  ) {
+    processedInput = {
+      ...input,
+      file_path: getRelativePath(input.file_path, rootPath),
+    };
   }
 
-  if (input.file_path && typeof input.file_path === 'string') {
-    // For file tools, convert absolute paths to relative paths
-    if (
-      rootPath &&
-      (toolName === 'readFile' || toolName === 'writeFile' || toolName === 'editFile')
-    ) {
-      return getRelativePath(input.file_path, rootPath);
-    }
-    return input.file_path;
-  }
-  if (input.query && typeof input.query === 'string') return input.query;
-  if (input.command && typeof input.command === 'string') {
-    // For bash tool, remove the leading "cd /path/to/workspace && " prefix
-    if (toolName === 'bashTool') {
-      const command = input.command as string;
-      const match = command.match(/^cd\s+[^\s]+\s+&&\s+(.+)$/);
-      return match?.[1] ?? command;
-    }
-    return input.command;
-  }
-  if (input.url && typeof input.url === 'string') return input.url;
-  if (input.agentId && typeof input.agentId === 'string') return input.agentId;
-
-  // Fallback: join values or JSON
-  const values = Object.values(input).filter((v) => typeof v === 'string' || typeof v === 'number');
-  if (values.length > 0 && values.length <= 2) {
-    return values.join(' ');
-  }
-
-  try {
-    return JSON.stringify(input);
-  } catch {
-    return 'Complex Input';
-  }
+  // Use shared formatter (no sanitization for desktop)
+  return sharedFormatToolInputSummary(toolName, processedInput, {
+    output,
+    sanitize: false,
+  });
 }
 
 export function UnifiedToolResult({

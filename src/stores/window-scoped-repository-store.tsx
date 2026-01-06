@@ -76,6 +76,7 @@ interface RepositoryActions {
   // External file change handling
   handleExternalFileChange: (filePath: string) => Promise<void>;
   applyExternalChange: (keepLocal: boolean) => void;
+  markRecentSave: (filePath: string) => void;
 }
 
 type RepositoryStore = RepositoryState & RepositoryActions;
@@ -83,7 +84,7 @@ type RepositoryStore = RepositoryState & RepositoryActions;
 // Track recently saved files to avoid false positive external change detection
 // Key: filePath, Value: timestamp
 const recentSaves = new Map<string, number>();
-const RECENT_SAVE_TIMEOUT = 1000; // 1 second window to ignore self-triggered file changes
+const RECENT_SAVE_TIMEOUT = 2000; // 2 second window to ignore self-triggered file changes
 
 // Store factory function for creating window-scoped stores
 function createRepositoryStore() {
@@ -415,7 +416,7 @@ function createRepositoryStore() {
     saveFile: async (filePath: string, content: string) => {
       try {
         // Mark this file as recently saved BEFORE writing to avoid race condition
-        recentSaves.set(filePath, Date.now());
+        get().markRecentSave(filePath);
 
         await repositoryService.writeFile(filePath, content);
 
@@ -424,14 +425,6 @@ function createRepositoryStore() {
             file.path === filePath ? { ...file, content, hasUnsavedChanges: false } : file
           ),
         }));
-
-        // Clean up old entries from recentSaves after timeout
-        setTimeout(() => {
-          const saveTime = recentSaves.get(filePath);
-          if (saveTime && Date.now() - saveTime >= RECENT_SAVE_TIMEOUT) {
-            recentSaves.delete(filePath);
-          }
-        }, RECENT_SAVE_TIMEOUT);
 
         toast.success(
           getTranslations().RepositoryStore.success.fileSaved(
@@ -777,6 +770,19 @@ function createRepositoryStore() {
         logger.info(`User chose to keep local changes for: ${filePath}`);
         set({ pendingExternalChange: null });
       }
+    },
+
+    // Mark a file as recently saved to prevent false positive external change detection
+    markRecentSave: (filePath: string) => {
+      recentSaves.set(filePath, Date.now());
+
+      // Clean up old entries from recentSaves after timeout
+      setTimeout(() => {
+        const saveTime = recentSaves.get(filePath);
+        if (saveTime && Date.now() - saveTime >= RECENT_SAVE_TIMEOUT) {
+          recentSaves.delete(filePath);
+        }
+      }, RECENT_SAVE_TIMEOUT);
     },
   }));
 }

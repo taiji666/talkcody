@@ -5,6 +5,7 @@ import { PlanReviewCard } from '@/components/plan/plan-review-card';
 import { Card } from '@/components/ui/card';
 import { createTool } from '@/lib/create-tool';
 import { logger } from '@/lib/logger';
+import { taskFileService } from '@/services/task-file-service';
 import { type PlanReviewResult, usePlanModeStore } from '@/stores/plan-mode-store';
 
 // Input schema for the tool
@@ -40,7 +41,34 @@ async function executeExitPlanMode(
 
     // Store the plan and resolver in the store with taskId
     // The UI component will call approvePlan or rejectPlan which will resolve this Promise
-    usePlanModeStore.getState().setPendingPlan(taskId, plan, resolve);
+    usePlanModeStore.getState().setPendingPlan(taskId, plan, async (result) => {
+      // Save plan to file only after user approval to avoid storing rejected plans
+      let planFilePath: string | undefined;
+
+      if (result.action === 'approve this plan, please implement it') {
+        try {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const fileName = `plan_${timestamp}.md`;
+          // Save the edited plan if user modified it, otherwise save the original
+          const finalPlan = result.editedPlan || plan;
+          planFilePath = await taskFileService.writeFile('plan', taskId, fileName, finalPlan);
+          logger.info('[ExitPlanMode] Saved approved plan to file', {
+            taskId,
+            planFilePath,
+            wasEdited: !!result.editedPlan,
+          });
+        } catch (error) {
+          logger.error('[ExitPlanMode] Failed to save plan to file', error);
+          // Continue even if file save fails - the plan content is still in memory
+        }
+      }
+
+      // Add planFilePath to the result before resolving
+      resolve({
+        ...result,
+        planFilePath,
+      });
+    });
   });
 }
 

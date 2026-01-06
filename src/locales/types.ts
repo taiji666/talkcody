@@ -1658,6 +1658,28 @@ export interface LocaleDefinition {
       severitySettingsDesc: string;
     };
   };
+
+  Share: {
+    title: string;
+    description: string;
+    messages: string;
+    emptyTask: string;
+    created: string;
+    failed: string;
+    copyFailed: string;
+    expiresIn: string;
+    expires1d: string;
+    expires7d: string;
+    expires30d: string;
+    expiresNever: string;
+    passwordProtection: string;
+    passwordPlaceholder: string;
+    privacyNotice: string;
+    copyLink: string;
+    openInBrowser: string;
+    passwordSet: string;
+    createLink: string;
+  };
 }
 
 export type LocaleMap = {

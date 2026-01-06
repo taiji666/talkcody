@@ -8,6 +8,7 @@ export interface PlanReviewResult {
   action: 'approve this plan, please implement it' | 'reject this plan, do not implement it';
   editedPlan?: string; // If user edited the plan before approval
   feedback?: string; // If user rejected and provided feedback
+  planFilePath?: string; // File path where the plan is saved
 }
 
 interface PendingPlan {
