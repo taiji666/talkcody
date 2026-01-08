@@ -14,6 +14,8 @@ export interface ToolExecuteContext {
 // Context passed to tool rendering functions (subset of execute context)
 export interface ToolRenderContext {
   taskId?: string;
+  /** Optional tool name for UI rendering */
+  toolName?: string;
 }
 
 export interface ToolWithUI<
@@ -25,7 +27,7 @@ export interface ToolWithUI<
   inputSchema: z.ZodSchema<TInput>;
   execute: (params: TInput, context: ToolExecuteContext) => Promise<TOutput>;
   renderToolDoing: (params: TInput, context?: ToolRenderContext) => ReactElement;
-  renderToolResult: (result: TOutput, params: TInput) => ReactElement;
+  renderToolResult: (result: TOutput, params: TInput, context?: ToolRenderContext) => ReactElement;
   canConcurrent: boolean;
   /** Whether to hide this tool from the UI tool selector */
   hidden?: boolean;

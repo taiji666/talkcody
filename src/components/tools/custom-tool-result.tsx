@@ -8,22 +8,24 @@ interface CustomToolResultProps {
 }
 
 export function CustomToolResult({ definition, input, output }: CustomToolResultProps) {
-  if (definition.ui?.Result) {
-    return definition.ui.Result(output, input, { toolName: definition.name });
-  }
+  const render =
+    definition.renderToolResult ??
+    ((result: unknown) => {
+      if (result && typeof result === 'object') {
+        const outputObj = result as { success?: boolean; error?: string };
+        if (outputObj.success === false || outputObj.error) {
+          return (
+            <CustomToolResultFallback
+              success={outputObj.success ?? false}
+              error={outputObj.error || 'Custom tool failed'}
+            />
+          );
+        }
+      }
 
-  if (output && typeof output === 'object') {
-    const outputObj = output as { success?: boolean; error?: string };
-    if (outputObj.success === false || outputObj.error) {
-      return (
-        <CustomToolResultFallback
-          success={outputObj.success ?? false}
-          error={outputObj.error || 'Custom tool failed'}
-        />
-      );
-    }
-  }
+      const message = typeof result === 'string' ? result : 'Custom tool executed';
+      return <CustomToolResultFallback message={message} success={true} />;
+    });
 
-  const message = typeof output === 'string' ? output : 'Custom tool executed';
-  return <CustomToolResultFallback message={message} success={true} />;
+  return render(output, input, { toolName: definition.name });
 }

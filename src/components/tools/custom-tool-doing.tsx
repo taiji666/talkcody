@@ -7,9 +7,7 @@ interface CustomToolDoingProps {
 }
 
 export function CustomToolDoing({ definition, input }: CustomToolDoingProps) {
-  if (definition.ui?.Doing) {
-    return definition.ui.Doing(input, { toolName: definition.name });
-  }
-
-  return <CustomToolDoingFallback toolName={definition.name} />;
+  const render =
+    definition.renderToolDoing ?? (() => <CustomToolDoingFallback toolName={definition.name} />);
+  return render(input, { toolName: definition.name });
 }

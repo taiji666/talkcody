@@ -12,7 +12,12 @@ const builtinLoaders = new Map<string, () => Promise<unknown>>([
   ['zod', () => import('zod')],
 ]);
 
-const internalModuleLoaders = import.meta.glob('/src/**/*.{ts,tsx,js,jsx}');
+const internalModuleLoaders = import.meta.glob([
+  '/src/**/*.{ts,tsx,js,jsx}',
+  '!/src/**/*.test.{ts,tsx,js,jsx}',
+  '!/src/**/*.spec.{ts,tsx,js,jsx}',
+  '!/src/test/**',
+]);
 
 function buildInternalCandidates(specifier: string): string[] {
   if (!specifier.startsWith('@/')) {
@@ -47,6 +52,10 @@ async function loadInternalModule(specifier: string): Promise<unknown> {
 
 export function getCustomToolModuleRegistry() {
   return moduleRegistry;
+}
+
+export function __getInternalModuleLoaderKeys() {
+  return Object.keys(internalModuleLoaders);
 }
 
 export function registerCustomToolModule(alias: string, moduleRef: unknown) {

@@ -13,7 +13,7 @@ interface CreateToolOptions {
   /* biome-ignore lint/suspicious/noExplicitAny: Tool parameters are dynamic based on input schema */
   renderToolDoing: (params: any, context?: ToolRenderContext) => ReactElement;
   /* biome-ignore lint/suspicious/noExplicitAny: Tool parameters are dynamic based on input schema */
-  renderToolResult: (result: any, params: any) => ReactElement;
+  renderToolResult: (result: any, params: any, context?: ToolRenderContext) => ReactElement;
   canConcurrent: boolean;
   hidden?: boolean;
 }

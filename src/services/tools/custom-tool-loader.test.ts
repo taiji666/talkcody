@@ -56,9 +56,12 @@ vi.mock('./custom-tool-compiler', () => {
 function createDefinition(name: string): CustomToolDefinition {
   return {
     name,
-    description: { en: `${name} tool`, zh: `${name} 工具` },
-    args: z.object({}),
+    description: `${name} tool`,
+    inputSchema: z.object({}),
     execute: vi.fn(async () => `run-${name}`),
+    renderToolDoing: vi.fn(() => null),
+    renderToolResult: vi.fn(() => null),
+    canConcurrent: false,
   };
 }
 
@@ -91,15 +94,21 @@ describe('custom-tool-loader multi-directory support', () => {
 
     const sharedWorkspace: CustomToolDefinition = {
       name: 'shared',
-      description: { en: 'workspace', zh: 'workspace' },
-      args: z.object({}),
+      description: 'workspace',
+      inputSchema: z.object({}),
       execute: vi.fn(async () => 'workspace'),
+      renderToolDoing: vi.fn(() => null),
+      renderToolResult: vi.fn(() => null),
+      canConcurrent: false,
     };
     const sharedUser: CustomToolDefinition = {
       name: 'shared',
-      description: { en: 'user', zh: 'user' },
-      args: z.object({}),
+      description: 'user',
+      inputSchema: z.object({}),
       execute: vi.fn(async () => 'user'),
+      renderToolDoing: vi.fn(() => null),
+      renderToolResult: vi.fn(() => null),
+      canConcurrent: false,
     };
 
     definitionQueue.push(sharedWorkspace);
@@ -118,7 +127,7 @@ describe('custom-tool-loader multi-directory support', () => {
     expect(names.filter((name) => name === 'shared')).toHaveLength(1);
 
     const sharedDefinition = result.definitions.find((d) => d.name === 'shared');
-    expect(sharedDefinition?.description.en).toBe('workspace');
+    expect(sharedDefinition?.description).toBe('workspace');
     expect(result.errors).toHaveLength(0);
   });
 
