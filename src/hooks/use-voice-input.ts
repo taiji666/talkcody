@@ -1,6 +1,7 @@
 // src/hooks/use-voice-input.ts
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from '@/hooks/use-locale';
 import { logger } from '@/lib/logger';
 import { aiTranscriptionService } from '@/services/ai/ai-transcription-service';
@@ -31,7 +32,13 @@ export function useVoiceInput() {
     isConnecting: false,
   });
 
-  const { model_type_transcription, getProviderApiKey, language } = useSettingsStore();
+  const { model_type_transcription, getProviderApiKey, language } = useSettingsStore(
+    useShallow((settings) => ({
+      model_type_transcription: settings.model_type_transcription,
+      getProviderApiKey: settings.getProviderApiKey,
+      language: settings.language,
+    }))
+  );
 
   // MediaRecorder refs (for Whisper)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);

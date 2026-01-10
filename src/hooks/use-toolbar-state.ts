@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { logger } from '@/lib/logger';
 import { modelService, useProviderStore } from '@/providers/stores/provider-store';
 import { useSettingsStore } from '@/stores/settings-store';
@@ -46,7 +47,7 @@ export function useToolbarState(): ToolbarState {
 
   // Get current task usage from task store
   const currentTask = useTaskStore((state) =>
-    state.currentTaskId ? state.tasks.get(state.currentTaskId) : undefined
+    state.currentTaskId ? state.getTask(state.currentTaskId) : undefined
   );
   const cost = currentTask?.cost ?? 0;
   const inputTokens = currentTask?.input_token ?? 0;
@@ -61,7 +62,15 @@ export function useToolbarState(): ToolbarState {
     model_type_image_generator,
     model_type_transcription,
     assistantId,
-  } = useSettingsStore();
+  } = useSettingsStore(
+    useShallow((state) => ({
+      model_type_main: state.model_type_main,
+      model_type_small: state.model_type_small,
+      model_type_image_generator: state.model_type_image_generator,
+      model_type_transcription: state.model_type_transcription,
+      assistantId: state.assistantId,
+    }))
+  );
 
   // Get available models from store
   const availableModels = useProviderStore((state) => state.availableModels);

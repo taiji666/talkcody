@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { messageService } from '@/services/message-service';
 import { useExecutionStore } from '@/stores/execution-store';
 import { useTaskStore } from '@/stores/task-store';
@@ -24,23 +25,16 @@ const EMPTY_MESSAGES: UIMessage[] = [];
  * Hook for accessing a single task's data and execution state
  */
 export function useTask(taskId: string | null | undefined) {
-  // Get tasks Map from TaskStore (stable reference)
-  const tasksMap = useTaskStore((state) => state.tasks);
-  const task = useMemo(() => (taskId ? tasksMap.get(taskId) : undefined), [tasksMap, taskId]);
+  // Subscribe to only the current task to avoid unrelated updates
+  const task = useTaskStore((state) => (taskId ? state.getTask(taskId) : undefined));
 
-  // Get messages Map from TaskStore (stable reference)
-  const messagesMap = useTaskStore((state) => state.messages);
-  const rawMessages = useMemo(() => {
-    if (!taskId) return EMPTY_MESSAGES;
-    return messagesMap.get(taskId) || EMPTY_MESSAGES;
-  }, [messagesMap, taskId]);
-
-  // Get executions Map from ExecutionStore (stable reference)
-  const executionsMap = useExecutionStore((state) => state.executions);
-  const execution = useMemo(
-    () => (taskId ? executionsMap.get(taskId) : undefined),
-    [executionsMap, taskId]
+  // Subscribe to only the current task's messages
+  const rawMessages = useTaskStore((state) =>
+    taskId ? state.getMessages(taskId) : EMPTY_MESSAGES
   );
+
+  // Subscribe to only the current task's execution state
+  const execution = useExecutionStore((state) => (taskId ? state.getExecution(taskId) : undefined));
 
   // Derived: is this task currently running?
   const isRunning = execution?.status === 'running';
@@ -95,36 +89,21 @@ export function useTask(taskId: string | null | undefined) {
  * Hook for checking if any task is currently running
  */
 export function useAnyTaskRunning(): boolean {
-  const executions = useExecutionStore((state) => state.executions);
-  return useMemo(() => {
-    return Array.from(executions.values()).some((e) => e.status === 'running');
-  }, [executions]);
+  return useExecutionStore((state) => state.getRunningCount() > 0);
 }
 
 /**
  * Hook for getting all running task IDs
  */
 export function useRunningTaskIds(): string[] {
-  const executions = useExecutionStore((state) => state.executions);
-  return useMemo(() => {
-    return Array.from(executions.values())
-      .filter((e) => e.status === 'running')
-      .map((e) => e.taskId);
-  }, [executions]);
+  return useExecutionStore(useShallow((state) => state.getRunningTaskIds()));
 }
 
 /**
  * Hook for checking if a new task execution can be started
  */
 export function useCanStartNewExecution(): boolean {
-  const executions = useExecutionStore((state) => state.executions);
-  const maxConcurrent = useExecutionStore((state) => state.maxConcurrent);
-  return useMemo(() => {
-    const runningCount = Array.from(executions.values()).filter(
-      (e) => e.status === 'running'
-    ).length;
-    return runningCount < maxConcurrent;
-  }, [executions, maxConcurrent]);
+  return useExecutionStore((state) => state.canStartNew());
 }
 
 /**
@@ -132,14 +111,10 @@ export function useCanStartNewExecution(): boolean {
  * Provides message operations like clear, delete, and stop streaming
  */
 export function useMessages(conversationId?: string) {
-  // Get messages Map from TaskStore (stable reference)
-  const messagesMap = useTaskStore((state) => state.messages);
-
-  // Derive messages with memoization
-  const messages: UIMessage[] = useMemo(() => {
-    if (!conversationId) return EMPTY_MESSAGES;
-    return messagesMap.get(conversationId) || EMPTY_MESSAGES;
-  }, [messagesMap, conversationId]);
+  // Subscribe to only this conversation's messages
+  const messages: UIMessage[] = useTaskStore((state) =>
+    conversationId ? state.getMessages(conversationId) : EMPTY_MESSAGES
+  );
 
   // Clear messages
   const clearMessages = useCallback(() => {
