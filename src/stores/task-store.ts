@@ -389,11 +389,17 @@ export const useTaskStore = create<TaskState>()(
             const existing = newMessages.get(taskId) || [];
             newMessages.set(taskId, [...existing, fullMessage]);
 
-            // Also update task's updated_at for chat history sorting
+            // Update task's updated_at only for user messages
+            // This prevents unnecessary re-sorting during AI streaming
             const task = state.tasks.get(taskId);
             if (task) {
               const newTasks = new Map(state.tasks);
-              newTasks.set(taskId, { ...task, updated_at: Date.now() });
+              const updatedTask = {
+                ...task,
+                message_count: (task.message_count ?? 0) + 1,
+                ...(message.role === 'user' ? { updated_at: Date.now() } : {}),
+              };
+              newTasks.set(taskId, updatedTask);
               return { messages: newMessages, tasks: newTasks };
             }
 
@@ -654,7 +660,14 @@ export const useTaskStore = create<TaskState>()(
 
       getTaskList: () => {
         const tasks = Array.from(get().tasks.values());
-        return tasks.sort((a, b) => b.updated_at - a.updated_at);
+        // Sort by updated_at descending, then by created_at descending for stability
+        return tasks.sort((a, b) => {
+          if (b.updated_at !== a.updated_at) {
+            return b.updated_at - a.updated_at;
+          }
+          // Same updated_at, use created_at as tie-breaker
+          return b.created_at - a.created_at;
+        });
       },
 
       getMessages: (taskId) => {

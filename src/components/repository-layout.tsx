@@ -21,6 +21,7 @@ import { useGlobalFileSearch } from '@/hooks/use-global-file-search';
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts';
 import { useTranslation } from '@/hooks/use-locale';
 import { useRepositoryWatcher } from '@/hooks/use-repository-watcher';
+import { useStableRunningIds } from '@/hooks/use-stable-running-ids';
 import { useTask } from '@/hooks/use-task';
 import { useTasks } from '@/hooks/use-tasks';
 import { useWorktreeConflict } from '@/hooks/use-worktree-conflict';
@@ -171,7 +172,7 @@ export function RepositoryLayout() {
   const { task: currentTask, messages: currentMessages } = useTask(currentTaskId);
 
   // Task History state
-  const runningTaskIds = useExecutionStore(useShallow((state) => state.getRunningTaskIds()));
+  const runningTaskIds = useStableRunningIds();
   const isMaxReached = useExecutionStore((state) => state.isMaxReached());
   const getWorktreeForTask = useWorktreeStore((state) => state.getWorktreeForTask);
 

@@ -7,7 +7,6 @@ import { useExecutionStore } from '@/stores/execution-store';
 import type { Task } from '@/types';
 import type { UIMessage } from '@/types/agent';
 
-import { ChatHistory } from './chat-history';
 import { ShareTaskDialog } from './task/share-task-dialog';
 import { ToolbarStats } from './toolbar-stats';
 
@@ -82,23 +81,6 @@ export function ChatPanelHeader({
             }
           />
         )}
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <ChatHistory
-                currentTaskId={currentTaskId}
-                isOpen={isHistoryOpen}
-                onTaskSelect={onTaskSelect}
-                onNewChat={onNewChat}
-                onOpenChange={onHistoryOpenChange}
-              />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{t.Chat.chatHistory}</p>
-          </TooltipContent>
-        </Tooltip>
 
         {/* Fullscreen Toggle */}
         {onToggleFullscreen && (

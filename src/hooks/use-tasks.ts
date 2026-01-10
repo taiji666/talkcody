@@ -31,7 +31,14 @@ export function useTasks(onTaskStart?: (taskId: string, title: string) => void) 
   // Derive task list with memoization to avoid infinite loops
   const tasks = useMemo(() => {
     const list = Array.from(tasksMap.values());
-    return list.sort((a, b) => b.updated_at - a.updated_at);
+    // Sort by updated_at descending, then by created_at descending for stability
+    return list.sort((a, b) => {
+      if (b.updated_at !== a.updated_at) {
+        return b.updated_at - a.updated_at;
+      }
+      // Same updated_at, use created_at as tie-breaker
+      return b.created_at - a.created_at;
+    });
   }, [tasksMap]);
 
   // UI state for editing

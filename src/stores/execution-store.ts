@@ -18,6 +18,42 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { logger } from '@/lib/logger';
 
+// Cache for running task IDs to prevent unnecessary re-renders
+let cachedRunningIds: {
+  ids: string[];
+  version: number;
+  lastExecutionSize: number;
+} = {
+  ids: [],
+  version: 0,
+  lastExecutionSize: 0,
+};
+
+// Helper function to check if running IDs actually changed
+function getRunningIdsWithCache(executions: Map<string, TaskExecution>): string[] {
+  const runningIds = Array.from(executions.values())
+    .filter((e) => e.status === 'running')
+    .map((e) => e.taskId);
+
+  // Check if cache is still valid
+  if (
+    cachedRunningIds.ids.length === runningIds.length &&
+    cachedRunningIds.lastExecutionSize === executions.size &&
+    cachedRunningIds.ids.every((id, index) => id === runningIds[index])
+  ) {
+    return cachedRunningIds.ids;
+  }
+
+  // Update cache
+  cachedRunningIds = {
+    ids: runningIds,
+    version: cachedRunningIds.version + 1,
+    lastExecutionSize: executions.size,
+  };
+
+  return cachedRunningIds.ids;
+}
+
 /**
  * Execution status for a task
  */
@@ -41,7 +77,7 @@ export interface TaskExecution {
   serverStatus: string;
 }
 
-interface ExecutionState {
+export interface ExecutionState {
   // Execution state (taskId -> TaskExecution)
   executions: Map<string, TaskExecution>;
 
@@ -394,9 +430,7 @@ export const useExecutionStore = create<ExecutionState>()(
 
       getRunningTaskIds: () => {
         const { executions } = get();
-        return Array.from(executions.values())
-          .filter((e) => e.status === 'running')
-          .map((e) => e.taskId);
+        return getRunningIdsWithCache(executions);
       },
 
       isMaxReached: () => {

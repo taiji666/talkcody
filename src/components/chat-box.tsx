@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
+import { useExecutionState } from '@/hooks/use-execution-state';
 import { useMessages } from '@/hooks/use-task';
 import { useTasks } from '@/hooks/use-tasks';
 import { logger } from '@/lib/logger';
@@ -27,7 +28,6 @@ import { messageService } from '@/services/message-service';
 import { previewSystemPrompt } from '@/services/prompt/preview';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 import { useAuthStore } from '@/stores/auth-store';
-import { useExecutionStore } from '@/stores/execution-store';
 import { settingsManager, useSettingsStore } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
 import { useWorktreeStore } from '@/stores/worktree-store';
@@ -87,20 +87,8 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
     const language = useSettingsStore((state) => state.language);
     const t = useMemo(() => getLocale((language || 'en') as SupportedLocale), [language]);
 
-    // Derive loading state from TaskExecutionStore (instead of local state)
-    // This ensures correct state when switching between tasks
-    // Using useShallow to combine subscriptions and reduce re-renders
-    const { isLoading, serverStatus, error } = useExecutionStore(
-      useShallow((state) => {
-        if (!taskId) return { isLoading: false, serverStatus: '', error: undefined };
-        const execution = state.getExecution(taskId);
-        return {
-          isLoading: state.isTaskRunning(taskId),
-          serverStatus: execution?.serverStatus ?? '',
-          error: execution?.error,
-        };
-      })
-    );
+    // Use optimized hook for execution state - only subscribes to changes for this specific task
+    const { isLoading, serverStatus, error } = useExecutionState(taskId);
     const status: ChatStatus = isLoading ? 'streaming' : 'ready';
 
     // useTasks first to get currentTaskId
