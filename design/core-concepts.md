@@ -148,7 +148,6 @@ interface TaskState {
   currentTaskId: string | null;
   messages: Map<string, UIMessage[]>;  // LRU cache, max 20 Tasks
   loadingTasks: boolean;
-  loadingMessages: Set<string>;
 }
 ```
 

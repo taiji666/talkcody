@@ -90,7 +90,9 @@ export const mockToast = {
 // ============================================================================
 export const mockTaskManager = {
   getTaskSettings: vi.fn().mockResolvedValue(null),
-  updateTaskSettings: vi.fn().mockResolvedValue(undefined),
+  updateTaskSettings: vi.fn().mockImplementation(async (_taskId: string, settings: object) => {
+    return Promise.resolve(undefined);
+  }),
 };
 
 // ============================================================================

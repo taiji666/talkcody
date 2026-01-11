@@ -42,7 +42,7 @@ vi.mock('@/stores/edit-review-store', () => {
 // Import after mocks
 import { editFile } from './edit-file-tool';
 import { repositoryService } from '@/services/repository-service';
-import { TaskManager } from '@/services/task-manager';
+import { taskService } from '@/services/task-service';
 import { notificationService } from '@/services/notification-service';
 import { useEditReviewStore } from '@/stores/edit-review-store';
 
@@ -51,7 +51,7 @@ const testContext = { taskId: 'conv-123', toolId: 'tool-123' };
 
 describe('editFile tool', () => {
   const mockRepositoryService = repositoryService as any;
-  const mockTaskManager = TaskManager as any;
+  const mockTaskService = taskService as any;
   const mockNotificationService = notificationService as any;
 
   // Get the mock store state from the mocked module
@@ -149,7 +149,7 @@ describe('editFile tool', () => {
 
   describe('path security', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should accept valid path within project directory', async () => {
@@ -207,7 +207,7 @@ describe('editFile tool', () => {
 
   describe('file operations', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should successfully read existing file', async () => {
@@ -275,7 +275,7 @@ describe('editFile tool', () => {
 
   describe('edit application', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     describe('single edit', () => {
@@ -518,7 +518,7 @@ describe('editFile tool', () => {
 
   describe('smart matching', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should match exact string', async () => {
@@ -650,7 +650,7 @@ describe('editFile tool', () => {
         const fileContent = 'const value = "test";\n';
         mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
         mockRepositoryService.writeFile.mockResolvedValue(undefined);
-        mockTaskManager.getTaskSettings.mockResolvedValue(
+        mockTaskService.getTaskSettings.mockResolvedValue(
           JSON.stringify({ autoApproveEdits: true })
         );
 
@@ -669,7 +669,7 @@ describe('editFile tool', () => {
         const fileContent = 'const value = "test";\n';
         mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
         mockRepositoryService.writeFile.mockResolvedValue(undefined);
-        mockTaskManager.getTaskSettings.mockResolvedValue(
+        mockTaskService.getTaskSettings.mockResolvedValue(
           JSON.stringify({ autoApproveEdits: true })
         );
 
@@ -687,7 +687,7 @@ describe('editFile tool', () => {
       it('should store pending edit correctly', async () => {
         const fileContent = 'const value = "test";\n';
         mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
-        mockTaskManager.getTaskSettings.mockResolvedValue(null);
+        mockTaskService.getTaskSettings.mockResolvedValue(null);
 
         // Reset the mock to track calls
         const mockSetPendingEdit = vi.fn();
@@ -727,7 +727,7 @@ describe('editFile tool', () => {
       it('should register callbacks (approve/reject/allowAll)', async () => {
         const fileContent = 'const value = "test";\n';
         mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
-        mockTaskManager.getTaskSettings.mockResolvedValue(null);
+        mockTaskService.getTaskSettings.mockResolvedValue(null);
 
         const mockSetPendingEdit = vi.fn();
         getMockStoreState().setPendingEdit = mockSetPendingEdit;
@@ -763,7 +763,7 @@ describe('editFile tool', () => {
         const fileContent = 'const value = "test";\n';
         mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
         mockRepositoryService.writeFile.mockResolvedValue(undefined);
-        mockTaskManager.getTaskSettings.mockResolvedValue(null);
+        mockTaskService.getTaskSettings.mockResolvedValue(null);
 
         const mockSetPendingEdit = vi.fn();
         getMockStoreState().setPendingEdit = mockSetPendingEdit;
@@ -788,7 +788,7 @@ describe('editFile tool', () => {
       it('should handle rejection with feedback', async () => {
         const fileContent = 'const value = "test";\n';
         mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
-        mockTaskManager.getTaskSettings.mockResolvedValue(null);
+        mockTaskService.getTaskSettings.mockResolvedValue(null);
 
         const mockSetPendingEdit = vi.fn();
         getMockStoreState().setPendingEdit = mockSetPendingEdit;
@@ -818,8 +818,8 @@ describe('editFile tool', () => {
         const fileContent = 'const value = "test";\n';
         mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
         mockRepositoryService.writeFile.mockResolvedValue(undefined);
-        mockTaskManager.getTaskSettings.mockResolvedValue(null);
-        mockTaskManager.updateTaskSettings.mockResolvedValue(undefined);
+        mockTaskService.getTaskSettings.mockResolvedValue(null);
+        mockTaskService.updateTaskSettings.mockResolvedValue(undefined);
 
         const mockSetPendingEdit = vi.fn();
         getMockStoreState().setPendingEdit = mockSetPendingEdit;
@@ -837,9 +837,9 @@ describe('editFile tool', () => {
           review_mode: true,
         }, testContext);
 
-        expect(mockTaskManager.updateTaskSettings).toHaveBeenCalledWith(
+        expect(mockTaskService.updateTaskSettings).toHaveBeenCalledWith(
           'conv-123',
-          expect.stringContaining('autoApproveEdits')
+          { autoApproveEdits: true }
         );
         expect(result.success).toBe(true);
       });
@@ -848,7 +848,7 @@ describe('editFile tool', () => {
 
   describe('error message generation', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should generate detailed error with file path', async () => {
@@ -934,7 +934,7 @@ describe('editFile tool', () => {
 
   describe('direct mode', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should successfully write file without review', async () => {
@@ -1043,7 +1043,7 @@ describe('editFile tool', () => {
     it('should handle settings parsing error and fallback to review', async () => {
       const fileContent = 'const value = "test";\n';
       mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
-      mockTaskManager.getTaskSettings.mockResolvedValue('invalid json');
+      mockTaskService.getTaskSettings.mockResolvedValue('invalid json');
 
       const mockSetPendingEdit = vi.fn();
       getMockStoreState().setPendingEdit = mockSetPendingEdit;
@@ -1066,7 +1066,7 @@ describe('editFile tool', () => {
     it('should handle review dialog error', async () => {
       const fileContent = 'const value = "test";\n';
       mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
 
       // Mock setPendingEdit to simulate an error in the review process
       // New signature: (taskId, editId, pendingEdit, callbacks, resolver)
@@ -1088,7 +1088,7 @@ describe('editFile tool', () => {
     it('should send notification when review required', async () => {
       const fileContent = 'const value = "test";\n';
       mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
       mockNotificationService.notifyReviewRequired.mockResolvedValue(undefined);
 
       // Mock setPendingEdit to immediately resolve
@@ -1166,7 +1166,7 @@ describe('editFile tool', () => {
       const fileContent = 'const value = "test";\n';
       mockRepositoryService.readFileWithCache.mockResolvedValue(fileContent);
       mockRepositoryService.writeFile.mockResolvedValue(undefined);
-      mockTaskManager.getTaskSettings.mockResolvedValue(
+      mockTaskService.getTaskSettings.mockResolvedValue(
         JSON.stringify({ autoApproveEdits: true })
       );
 
@@ -1177,7 +1177,7 @@ describe('editFile tool', () => {
       }, testContext);
 
       expect(result.success).toBe(true);
-      expect(mockTaskManager.getTaskSettings).toHaveBeenCalledWith('conv-123');
+      expect(mockTaskService.getTaskSettings).toHaveBeenCalledWith('conv-123');
     });
   });
 });

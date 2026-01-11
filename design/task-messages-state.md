@@ -132,11 +132,9 @@ chat-history.tsx / chat-box.tsx
 ┌───────────────────────────────────────┐
 │ 3. Load messages                      │
 │    taskService.loadMessages(taskId)   │
-│    ├─ TaskStore.setLoadingMessages(true)
 │    ├─ databaseService.getMessages(taskId)
 │    ├─ mapStoredMessagesToUI()         │
 │    ├─ TaskStore.setMessages()         │
-│    └─ TaskStore.setLoadingMessages(false)
 └───────────────────────────────────────┘
         ↓
 ┌───────────────────────────────────────┐
@@ -193,7 +191,6 @@ UI renders message list
   messages: Map<string, UIMessage[]>;
   messageAccessOrder: string[];  // LRU tracking
   loadingTasks: boolean;
-  loadingMessages: Set<string>;
   error: string | null;
 }
 ```

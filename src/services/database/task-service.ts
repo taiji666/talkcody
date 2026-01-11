@@ -332,9 +332,8 @@ export class TaskService {
 
   @timedMethod('updateTaskSettings')
   async updateTaskSettings(taskId: string, settings: string): Promise<void> {
-    const settingsStr = typeof settings === 'string' ? settings : JSON.stringify(settings);
     await this.db.execute('UPDATE conversations SET settings = $1, updated_at = $2 WHERE id = $3', [
-      settingsStr,
+      settings,
       Date.now(),
       taskId,
     ]);

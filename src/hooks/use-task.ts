@@ -40,11 +40,6 @@ export function useTask(taskId: string | null | undefined) {
   // Derived: server status (e.g., "Thinking...", "Executing tool...")
   const serverStatus = execution?.serverStatus;
 
-  // Get loading state
-  const isLoadingMessages = useTaskStore((state) =>
-    taskId ? state.loadingMessages.has(taskId) : false
-  );
-
   return {
     // Data
     task,
@@ -54,9 +49,6 @@ export function useTask(taskId: string | null | undefined) {
     isRunning,
     serverStatus,
     error: execution?.error,
-
-    // Loading states
-    isLoadingMessages,
 
     // Usage info (from task)
     cost: task?.cost ?? 0,

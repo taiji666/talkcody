@@ -285,13 +285,13 @@ describe('TaskService', () => {
   describe('updateTaskSettings / getTaskSettings', () => {
     it('should save and retrieve settings', async () => {
       await taskService.createTask('Task', 'id-settings');
-      const settings = { model: 'gpt-4', temperature: 0.7 };
+      const settings = JSON.stringify({ model: 'gpt-4', temperature: 0.7 });
 
       await taskService.updateTaskSettings('id-settings', settings);
       const retrieved = await taskService.getTaskSettings('id-settings');
 
-      // getTaskSettings returns raw string, caller should parse it
-      expect(retrieved).toEqual(JSON.stringify(settings));
+      // getTaskSettings returns raw string
+      expect(retrieved).toEqual(settings);
     });
 
     it('should return null if no settings', async () => {

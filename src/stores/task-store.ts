@@ -204,8 +204,6 @@ interface TaskState {
 
   // Loading states
   loadingTasks: boolean;
-  loadingMessages: Set<string>;
-
   // Error state
   error: string | null;
 
@@ -327,7 +325,6 @@ interface TaskState {
   // ============================================
 
   setLoadingTasks: (loading: boolean) => void;
-  setLoadingMessages: (taskId: string, loading: boolean) => void;
   setError: (error: string | null) => void;
 
   // ============================================
@@ -368,7 +365,6 @@ export const useTaskStore = create<TaskState>()(
       runningTaskUsage: new Map(),
       messages: new Map(),
       loadingTasks: false,
-      loadingMessages: new Set(),
       error: null,
 
       // ============================================
@@ -780,22 +776,6 @@ export const useTaskStore = create<TaskState>()(
 
       setLoadingTasks: (loading) => {
         set({ loadingTasks: loading }, false, 'setLoadingTasks');
-      },
-
-      setLoadingMessages: (taskId, loading) => {
-        set(
-          (state) => {
-            const loadingMessages = new Set(state.loadingMessages);
-            if (loading) {
-              loadingMessages.add(taskId);
-            } else {
-              loadingMessages.delete(taskId);
-            }
-            return { loadingMessages };
-          },
-          false,
-          'setLoadingMessages'
-        );
       },
 
       setError: (error) => {

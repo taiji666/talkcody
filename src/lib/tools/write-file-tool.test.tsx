@@ -8,9 +8,9 @@ vi.mock('@/services/notification-service', () => ({
   },
 }));
 
-// Mock TaskManager - create a proper mock object
-vi.mock('@/services/task-manager', () => ({
-  TaskManager: {
+// Mock taskService - create a proper mock object
+vi.mock('@/services/task-service', () => ({
+  taskService: {
     getTaskSettings: vi.fn().mockResolvedValue(null),
     updateTaskSettings: vi.fn().mockResolvedValue(undefined),
   },
@@ -48,7 +48,7 @@ vi.mock('@/stores/edit-review-store', () => {
 // Import after mocks
 import { writeFile } from './write-file-tool';
 import { repositoryService } from '@/services/repository-service';
-import { TaskManager } from '@/services/task-manager';
+import { taskService } from '@/services/task-service';
 import { notificationService } from '@/services/notification-service';
 import { useEditReviewStore } from '@/stores/edit-review-store';
 
@@ -57,7 +57,7 @@ const testContext = { taskId: 'conv-123' };
 
 describe('writeFile tool', () => {
   const mockRepositoryService = repositoryService as any;
-  const mockTaskManager = TaskManager as typeof TaskManager & {
+  const mockTaskService = taskService as typeof taskService & {
     getTaskSettings: ReturnType<typeof vi.fn>;
     updateTaskSettings: ReturnType<typeof vi.fn>;
   };
@@ -142,7 +142,7 @@ describe('writeFile tool', () => {
      */
 
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should handle content as object by stringifying it', async () => {
@@ -346,7 +346,7 @@ describe('writeFile tool', () => {
 
   describe('path security', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should accept valid path within project directory', async () => {
@@ -413,7 +413,7 @@ describe('writeFile tool', () => {
 
   describe('file operations', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should create new file successfully', async () => {
@@ -472,7 +472,7 @@ describe('writeFile tool', () => {
       it('should auto-approve when enabled in settings', async () => {
         mockRepositoryService.readFileWithCache.mockRejectedValue(new Error('File not found'));
         mockRepositoryService.writeFile.mockResolvedValue(undefined);
-        mockTaskManager.getTaskSettings.mockResolvedValue(JSON.stringify({ autoApproveEdits: true }));
+        mockTaskService.getTaskSettings.mockResolvedValue(JSON.stringify({ autoApproveEdits: true }));
 
         const result = await writeFile.execute(
           {
@@ -492,7 +492,7 @@ describe('writeFile tool', () => {
     describe('manual review', () => {
       it('should store pending edit correctly', async () => {
         mockRepositoryService.readFileWithCache.mockRejectedValue(new Error('File not found'));
-        mockTaskManager.getTaskSettings.mockResolvedValue(null);
+        mockTaskService.getTaskSettings.mockResolvedValue(null);
 
         const mockSetPendingEdit = vi.fn();
         getMockStoreState().setPendingEdit = mockSetPendingEdit;
@@ -531,7 +531,7 @@ describe('writeFile tool', () => {
       it('should handle approval successfully', async () => {
         mockRepositoryService.readFileWithCache.mockRejectedValue(new Error('File not found'));
         mockRepositoryService.writeFile.mockResolvedValue(undefined);
-        mockTaskManager.getTaskSettings.mockResolvedValue(null);
+        mockTaskService.getTaskSettings.mockResolvedValue(null);
 
         const mockSetPendingEdit = vi.fn();
         getMockStoreState().setPendingEdit = mockSetPendingEdit;
@@ -555,7 +555,7 @@ describe('writeFile tool', () => {
 
       it('should handle rejection with feedback', async () => {
         mockRepositoryService.readFileWithCache.mockRejectedValue(new Error('File not found'));
-        mockTaskManager.getTaskSettings.mockResolvedValue(null);
+        mockTaskService.getTaskSettings.mockResolvedValue(null);
 
         const mockSetPendingEdit = vi.fn();
         getMockStoreState().setPendingEdit = mockSetPendingEdit;
@@ -587,7 +587,7 @@ describe('writeFile tool', () => {
 
   describe('string content with special cases', () => {
     beforeEach(() => {
-      mockTaskManager.getTaskSettings.mockResolvedValue(null);
+      mockTaskService.getTaskSettings.mockResolvedValue(null);
     });
 
     it('should handle string with newlines correctly', async () => {

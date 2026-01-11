@@ -17,7 +17,7 @@ import { logger } from '@/lib/logger';
 import { createLLMService, type LLMService } from '@/services/agents/llm-service';
 import { messageService } from '@/services/message-service';
 import { notificationService } from '@/services/notification-service';
-import { TaskManager } from '@/services/task-manager';
+import { taskService } from '@/services/task-service';
 import { useExecutionStore } from '@/stores/execution-store';
 import { useTaskStore } from '@/stores/task-store';
 import { useWorktreeStore } from '@/stores/worktree-store';
@@ -140,13 +140,14 @@ class ExecutionService {
             const runningUsage = useTaskStore.getState().runningTaskUsage.get(taskId);
             if (runningUsage) {
               // Use finally to ensure clearRunningTaskUsage is called only after DB write completes
-              await TaskManager.updateTaskUsage(
-                taskId,
-                runningUsage.costDelta,
-                runningUsage.inputTokensDelta,
-                runningUsage.outputTokensDelta,
-                runningUsage.contextUsage
-              )
+              await taskService
+                .updateTaskUsage(
+                  taskId,
+                  runningUsage.costDelta,
+                  runningUsage.inputTokensDelta,
+                  runningUsage.outputTokensDelta,
+                  runningUsage.contextUsage
+                )
                 .then(() => {
                   // Flush running usage into task record after persistence
                   useTaskStore.getState().flushRunningTaskUsage(taskId);
@@ -262,7 +263,7 @@ class ExecutionService {
   ): Promise<void> {
     // Generate AI title for new tasks
     if (isNewTask && userMessage) {
-      TaskManager.generateAndUpdateTitle(taskId, userMessage).catch((error: Error) => {
+      taskService.generateAndUpdateTitle(taskId, userMessage).catch((error: Error) => {
         logger.error('Background title generation failed:', error);
       });
     }

@@ -55,9 +55,23 @@ vi.mock('../services/ai/ai-pricing-service', () => ({
   },
 }));
 
-vi.mock('../services/task-manager', () => ({
-  TaskManager: {
+vi.mock('../services/task-service', () => ({
+  taskService: {
     updateTaskUsage: vi.fn().mockResolvedValue(undefined),
+    updateTaskSettings: vi.fn().mockResolvedValue(undefined),
+    getTaskSettings: vi.fn().mockResolvedValue(null),
+    generateAndUpdateTitle: vi.fn().mockResolvedValue(undefined),
+    createTask: vi.fn().mockResolvedValue('test-task-id'),
+    loadTasks: vi.fn().mockResolvedValue(undefined),
+    loadMessages: vi.fn().mockResolvedValue([]),
+    selectTask: vi.fn().mockResolvedValue(undefined),
+    deleteTask: vi.fn().mockResolvedValue(undefined),
+    renameTask: vi.fn().mockResolvedValue(undefined),
+    updateTaskUsage: vi.fn().mockResolvedValue(undefined),
+    getTaskDetails: vi.fn().mockResolvedValue(null),
+    loadTasksWithPagination: vi.fn().mockResolvedValue([]),
+    loadTasksWithSearchPagination: vi.fn().mockResolvedValue([]),
+    startNewTask: vi.fn().mockReturnValue(undefined),
   },
 }));
 
@@ -813,8 +827,8 @@ describe('ChatService.runManualAgentLoop', () => {
     });
 
     it('should handle task usage update error gracefully', async () => {
-      const { TaskManager } = await import('../services/task-manager');
-      vi.mocked(TaskManager.updateTaskUsage).mockRejectedValue(
+      const { taskService } = await import('../services/task-service');
+      vi.mocked(taskService.updateTaskUsage).mockRejectedValue(
         new Error('Database error')
       );
 

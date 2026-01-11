@@ -31,7 +31,7 @@ export {
   mockUseSettingsStore,
 } from './settings-store';
 export { createMockToast, mockToast } from './sonner';
-export { createMockTaskManager, mockTaskManager } from './task-manager';
+export { createMockTaskService, mockTaskService } from './task-service';
 export { createMockTauriPath, mockTauriPath } from './tauri-path';
 export { createMockTodoStore, mockTodoStore } from './todo-store';
 export { createMockWorkspaceRootService, mockWorkspaceRootService } from './workspace-root-service';

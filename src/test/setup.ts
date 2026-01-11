@@ -7,7 +7,6 @@ import {
   mockLogger,
   mockRepositoryService,
   mockSettingsStore,
-  mockTaskManager,
   mockTauriPath,
   mockWorkspaceRootService,
 } from './mocks';
@@ -74,7 +73,24 @@ vi.mock('@/lib/logger', () => ({
 vi.mock('@/stores/settings-store', () => mockSettingsStore);
 vi.mock('@/services/workspace-root-service', () => mockWorkspaceRootService);
 vi.mock('@/services/database-service', () => ({ databaseService: mockDatabaseService }));
-vi.mock('@/services/task-manager', () => ({ TaskManager: mockTaskManager }));
+vi.mock('@/services/task-service', () => ({
+  taskService: {
+    getTaskSettings: vi.fn().mockResolvedValue(null),
+    updateTaskSettings: vi.fn().mockResolvedValue(undefined),
+    createTask: vi.fn().mockResolvedValue('test-task-id'),
+    loadTasks: vi.fn().mockResolvedValue([]),
+    loadMessages: vi.fn().mockResolvedValue([]),
+    selectTask: vi.fn().mockResolvedValue(undefined),
+    deleteTask: vi.fn().mockResolvedValue(undefined),
+    renameTask: vi.fn().mockResolvedValue(undefined),
+    updateTaskUsage: vi.fn().mockResolvedValue(undefined),
+    getTaskDetails: vi.fn().mockResolvedValue(null),
+    loadTasksWithPagination: vi.fn().mockResolvedValue([]),
+    loadTasksWithSearchPagination: vi.fn().mockResolvedValue([]),
+    startNewTask: vi.fn().mockReturnValue(undefined),
+    generateAndUpdateTitle: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 vi.mock('@/services/repository-service', () => ({ repositoryService: mockRepositoryService }));
 
 // Mock repository utils

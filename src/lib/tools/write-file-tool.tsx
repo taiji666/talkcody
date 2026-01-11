@@ -7,7 +7,7 @@ import { createPathSecurityError, isPathWithinProjectDirectory } from '@/lib/uti
 import { notificationService } from '@/services/notification-service';
 import { repositoryService } from '@/services/repository-service';
 import { normalizeFilePath } from '@/services/repository-utils';
-import { TaskManager } from '@/services/task-manager';
+import { taskService } from '@/services/task-service';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 import {
   type FileEditReviewResult,
@@ -89,7 +89,7 @@ The file path should be an absolute path.`,
       if (!taskId) {
         throw new Error('taskId is required for writeFile tool');
       }
-      const settingsJson = await TaskManager.getTaskSettings(taskId);
+      const settingsJson = await taskService.getTaskSettings(taskId);
 
       if (settingsJson) {
         try {
@@ -173,7 +173,7 @@ The file path should be an absolute path.`,
           onAllowAll: async () => {
             // 1. Update conversation settings to enable auto-approve
             const newSettings: TaskSettings = { autoApproveEdits: true };
-            await TaskManager.updateTaskSettings(taskId, JSON.stringify(newSettings));
+            await taskService.updateTaskSettings(taskId, newSettings);
             logger.info(`Auto-approve enabled for conversation ${taskId}`);
 
             // 2. Approve current write

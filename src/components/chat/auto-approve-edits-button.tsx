@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useLocale } from '@/hooks/use-locale';
 import { logger } from '@/lib/logger';
-import { TaskManager } from '@/services/task-manager';
+import { taskService } from '@/services/task-service';
 import { useTaskStore } from '@/stores/task-store';
 import type { TaskSettings } from '@/types/task';
 
@@ -26,7 +26,7 @@ export function AutoApproveEditsButton() {
 
     const loadSettings = async () => {
       try {
-        const settingsJson = await TaskManager.getTaskSettings(currentTaskId);
+        const settingsJson = await taskService.getTaskSettings(currentTaskId);
         if (settingsJson) {
           const settings: TaskSettings = JSON.parse(settingsJson);
           setIsEnabled(settings.autoApproveEdits === true);
@@ -49,7 +49,7 @@ export function AutoApproveEditsButton() {
     try {
       const newEnabled = !isEnabled;
       const settings: TaskSettings = { autoApproveEdits: newEnabled };
-      await TaskManager.updateTaskSettings(currentTaskId, JSON.stringify(settings));
+      await taskService.updateTaskSettings(currentTaskId, settings);
 
       setIsEnabled(newEnabled);
 

@@ -14,6 +14,7 @@
 import { logger } from '@/lib/logger';
 import { mapStoredMessagesToUI } from '@/lib/message-mapper';
 import { generateConversationTitle, generateId } from '@/lib/utils';
+import { aiTaskTitleService } from '@/services/ai/ai-task-title-service';
 import { databaseService } from '@/services/database-service';
 import { taskFileService } from '@/services/task-file-service';
 import { useEditReviewStore } from '@/stores/edit-review-store';
@@ -118,7 +119,6 @@ class TaskService {
    */
   async loadMessages(taskId: string): Promise<UIMessage[]> {
     const taskStore = useTaskStore.getState();
-    taskStore.setLoadingMessages(taskId, true);
 
     try {
       const storedMessages = await databaseService.getMessages(taskId);
@@ -129,8 +129,6 @@ class TaskService {
       logger.error('[TaskService] Failed to load messages:', error);
       taskStore.setError('Failed to load messages');
       return [];
-    } finally {
-      taskStore.setLoadingMessages(taskId, false);
     }
   }
 
@@ -148,20 +146,6 @@ class TaskService {
     if (existingMessages.length === 0) {
       await this.loadMessages(taskId);
     }
-
-    // // Update usage tracking from database
-    // try {
-    //   const details = await databaseService.getTaskDetails(taskId);
-    //   if (details) {
-    //     taskStore.updateTask(taskId, {
-    //       cost: details.cost,
-    //       input_token: details.input_token,
-    //       output_token: details.output_token,
-    //     });
-    //   }
-    // } catch (error) {
-    //   logger.error('[TaskService] Failed to load task details:', error);
-    // }
   }
 
   /**
@@ -244,9 +228,6 @@ class TaskService {
     }
   }
 
-  /**
-   * Update task settings
-   */
   async updateTaskSettings(taskId: string, settings: TaskSettings): Promise<void> {
     // 1. Update store
     useTaskStore.getState().updateTaskSettings(taskId, settings);
@@ -258,6 +239,35 @@ class TaskService {
     } catch (error) {
       logger.error('[TaskService] Failed to update task settings:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get task settings
+   */
+  async getTaskSettings(taskId: string): Promise<string | null> {
+    return await databaseService.getTaskSettings(taskId);
+  }
+
+  /**
+   * Generate AI title for task and update it asynchronously
+   * This method is fire-and-forget - it runs in the background without blocking
+   */
+  async generateAndUpdateTitle(taskId: string, userInput: string): Promise<void> {
+    try {
+      logger.info('Generating AI title for task:', taskId);
+
+      const result = await aiTaskTitleService.generateTitle(userInput);
+
+      if (result?.title) {
+        await this.renameTask(taskId, result.title);
+        logger.info('AI title updated successfully:', result.title);
+      } else {
+        logger.warn('AI title generation returned no result, keeping fallback title');
+      }
+    } catch (error) {
+      logger.error('Failed to generate/update AI title:', error);
+      // Silently fail - the fallback title is already in place
     }
   }
 
