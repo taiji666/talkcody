@@ -6,7 +6,6 @@
  */
 
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
 import type { UIMessage } from '@/types/agent';
 
 interface NestedToolsState {
@@ -20,46 +19,30 @@ interface NestedToolsState {
   getMessages: (parentToolCallId: string) => UIMessage[];
 }
 
-export const useNestedToolsStore = create<NestedToolsState>()(
-  devtools(
-    (set, get) => ({
-      messagesByParent: {},
+export const useNestedToolsStore = create<NestedToolsState>()((set, get) => ({
+  messagesByParent: {},
 
-      addMessage: (parentToolCallId, message) => {
-        set(
-          (state) => ({
-            messagesByParent: {
-              ...state.messagesByParent,
-              [parentToolCallId]: [...(state.messagesByParent[parentToolCallId] || []), message],
-            },
-          }),
-          false,
-          'addMessage'
-        );
+  addMessage: (parentToolCallId, message) => {
+    set((state) => ({
+      messagesByParent: {
+        ...state.messagesByParent,
+        [parentToolCallId]: [...(state.messagesByParent[parentToolCallId] || []), message],
       },
+    }));
+  },
 
-      clearMessages: (parentToolCallId) => {
-        set(
-          (state) => {
-            const { [parentToolCallId]: _, ...rest } = state.messagesByParent;
-            return { messagesByParent: rest };
-          },
-          false,
-          'clearMessages'
-        );
-      },
+  clearMessages: (parentToolCallId) => {
+    set((state) => {
+      const { [parentToolCallId]: _, ...rest } = state.messagesByParent;
+      return { messagesByParent: rest };
+    });
+  },
 
-      clearAll: () => {
-        set({ messagesByParent: {} }, false, 'clearAll');
-      },
+  clearAll: () => {
+    set({ messagesByParent: {} });
+  },
 
-      getMessages: (parentToolCallId) => {
-        return get().messagesByParent[parentToolCallId] || [];
-      },
-    }),
-    {
-      name: 'nested-tools-store',
-      enabled: import.meta.env.DEV,
-    }
-  )
-);
+  getMessages: (parentToolCallId) => {
+    return get().messagesByParent[parentToolCallId] || [];
+  },
+}));

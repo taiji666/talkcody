@@ -15,7 +15,6 @@
  */
 
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
 import { logger } from '@/lib/logger';
 
 // Cache for running task IDs to prevent unnecessary re-renders
@@ -180,271 +179,227 @@ export interface ExecutionState {
 
 const DEFAULT_MAX_CONCURRENT = 5;
 
-export const useExecutionStore = create<ExecutionState>()(
-  devtools(
-    (set, get) => ({
-      executions: new Map(),
-      maxConcurrent: DEFAULT_MAX_CONCURRENT,
+export const useExecutionStore = create<ExecutionState>()((set, get) => ({
+  executions: new Map(),
+  maxConcurrent: DEFAULT_MAX_CONCURRENT,
 
-      // ============================================
-      // Actions
-      // ============================================
+  // ============================================
+  // Actions
+  // ============================================
 
-      startExecution: (taskId) => {
-        const state = get();
-        const existing = state.executions.get(taskId);
+  startExecution: (taskId) => {
+    const state = get();
+    const existing = state.executions.get(taskId);
 
-        // Check if already running
-        if (existing?.status === 'running') {
-          logger.warn('[ExecutionStore] Task already running', { taskId });
-          return { success: false, error: 'Task is already running' };
-        }
-
-        // Check concurrency limit
-        const runningCount = state.getRunningCount();
-        if (runningCount >= state.maxConcurrent) {
-          logger.warn('[ExecutionStore] Max concurrent executions reached', {
-            taskId,
-            runningCount,
-            max: state.maxConcurrent,
-          });
-          return {
-            success: false,
-            error: `Maximum ${state.maxConcurrent} concurrent tasks reached`,
-          };
-        }
-
-        const abortController = new AbortController();
-
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            newExecutions.set(taskId, {
-              taskId,
-              status: 'running',
-              abortController,
-              startTime: new Date(),
-              streamingContent: '',
-              isStreaming: false,
-              serverStatus: '',
-            });
-            return { executions: newExecutions };
-          },
-          false,
-          'startExecution'
-        );
-
-        return { success: true, abortController };
-      },
-
-      stopExecution: (taskId) => {
-        const execution = get().executions.get(taskId);
-        if (!execution) {
-          logger.warn('[ExecutionStore] No execution found to stop', { taskId });
-          return;
-        }
-
-        // Abort the execution
-        execution.abortController.abort();
-
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            const existing = newExecutions.get(taskId);
-            if (existing) {
-              newExecutions.set(taskId, {
-                ...existing,
-                status: 'stopped',
-                isStreaming: false,
-              });
-            }
-            return { executions: newExecutions };
-          },
-          false,
-          'stopExecution'
-        );
-      },
-
-      completeExecution: (taskId) => {
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            const existing = newExecutions.get(taskId);
-            if (existing) {
-              newExecutions.set(taskId, {
-                ...existing,
-                status: 'completed',
-                isStreaming: false,
-              });
-            }
-            return { executions: newExecutions };
-          },
-          false,
-          'completeExecution'
-        );
-      },
-
-      setError: (taskId, error) => {
-        logger.error('[ExecutionStore] Setting error', { taskId, error });
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            const existing = newExecutions.get(taskId);
-            if (existing) {
-              newExecutions.set(taskId, {
-                ...existing,
-                status: 'error',
-                error,
-                isStreaming: false,
-              });
-            }
-            return { executions: newExecutions };
-          },
-          false,
-          'setError'
-        );
-      },
-
-      updateStreamingContent: (taskId, content, append = false) => {
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            const existing = newExecutions.get(taskId);
-            if (existing) {
-              newExecutions.set(taskId, {
-                ...existing,
-                streamingContent: append ? existing.streamingContent + content : content,
-                isStreaming: true,
-              });
-            }
-            return { executions: newExecutions };
-          },
-          false,
-          'updateStreamingContent'
-        );
-      },
-
-      clearStreamingContent: (taskId) => {
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            const existing = newExecutions.get(taskId);
-            if (existing) {
-              newExecutions.set(taskId, {
-                ...existing,
-                streamingContent: '',
-                isStreaming: false,
-              });
-            }
-            return { executions: newExecutions };
-          },
-          false,
-          'clearStreamingContent'
-        );
-      },
-
-      setIsStreaming: (taskId, isStreaming) => {
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            const existing = newExecutions.get(taskId);
-            if (existing) {
-              newExecutions.set(taskId, {
-                ...existing,
-                isStreaming,
-              });
-            }
-            return { executions: newExecutions };
-          },
-          false,
-          'setIsStreaming'
-        );
-      },
-
-      setServerStatus: (taskId, status) => {
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            const existing = newExecutions.get(taskId);
-            if (existing) {
-              newExecutions.set(taskId, {
-                ...existing,
-                serverStatus: status,
-              });
-            }
-            return { executions: newExecutions };
-          },
-          false,
-          'setServerStatus'
-        );
-      },
-
-      cleanupExecution: (taskId) => {
-        const execution = get().executions.get(taskId);
-        if (!execution) return;
-
-        // Only cleanup if not running
-        if (execution.status === 'running') {
-          logger.warn('[ExecutionStore] Cannot cleanup running execution', { taskId });
-          return;
-        }
-
-        logger.info('[ExecutionStore] Cleaning up execution', { taskId });
-        set(
-          (state) => {
-            const newExecutions = new Map(state.executions);
-            newExecutions.delete(taskId);
-            return { executions: newExecutions };
-          },
-          false,
-          'cleanupExecution'
-        );
-      },
-
-      // ============================================
-      // Selectors
-      // ============================================
-
-      isRunning: (taskId) => {
-        const execution = get().executions.get(taskId);
-        return execution?.status === 'running';
-      },
-
-      // Alias for backward compatibility
-      isTaskRunning: (taskId) => {
-        const execution = get().executions.get(taskId);
-        return execution?.status === 'running';
-      },
-
-      getExecution: (taskId) => {
-        return get().executions.get(taskId);
-      },
-
-      getRunningTaskIds: () => {
-        const { executions } = get();
-        return getRunningIdsWithCache(executions);
-      },
-
-      isMaxReached: () => {
-        const state = get();
-        return state.getRunningCount() >= state.maxConcurrent;
-      },
-
-      getRunningCount: () => {
-        const { executions } = get();
-        return Array.from(executions.values()).filter((e) => e.status === 'running').length;
-      },
-
-      canStartNew: () => {
-        return !get().isMaxReached();
-      },
-    }),
-    {
-      name: 'execution-store',
-      enabled: import.meta.env.DEV,
+    // Check if already running
+    if (existing?.status === 'running') {
+      logger.warn('[ExecutionStore] Task already running', { taskId });
+      return { success: false, error: 'Task is already running' };
     }
-  )
-);
+
+    // Check concurrency limit
+    const runningCount = state.getRunningCount();
+    if (runningCount >= state.maxConcurrent) {
+      logger.warn('[ExecutionStore] Max concurrent executions reached', {
+        taskId,
+        runningCount,
+        max: state.maxConcurrent,
+      });
+      return {
+        success: false,
+        error: `Maximum ${state.maxConcurrent} concurrent tasks reached`,
+      };
+    }
+
+    const abortController = new AbortController();
+
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      newExecutions.set(taskId, {
+        taskId,
+        status: 'running',
+        abortController,
+        startTime: new Date(),
+        streamingContent: '',
+        isStreaming: false,
+        serverStatus: '',
+      });
+      return { executions: newExecutions };
+    });
+
+    return { success: true, abortController };
+  },
+
+  stopExecution: (taskId) => {
+    const execution = get().executions.get(taskId);
+    if (!execution) {
+      logger.warn('[ExecutionStore] No execution found to stop', { taskId });
+      return;
+    }
+
+    // Abort the execution
+    execution.abortController.abort();
+
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      const existing = newExecutions.get(taskId);
+      if (existing) {
+        newExecutions.set(taskId, {
+          ...existing,
+          status: 'stopped',
+          isStreaming: false,
+        });
+      }
+      return { executions: newExecutions };
+    });
+  },
+
+  completeExecution: (taskId) => {
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      const existing = newExecutions.get(taskId);
+      if (existing) {
+        newExecutions.set(taskId, {
+          ...existing,
+          status: 'completed',
+          isStreaming: false,
+        });
+      }
+      return { executions: newExecutions };
+    });
+  },
+
+  setError: (taskId, error) => {
+    logger.error('[ExecutionStore] Setting error', { taskId, error });
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      const existing = newExecutions.get(taskId);
+      if (existing) {
+        newExecutions.set(taskId, {
+          ...existing,
+          status: 'error',
+          error,
+          isStreaming: false,
+        });
+      }
+      return { executions: newExecutions };
+    });
+  },
+
+  updateStreamingContent: (taskId, content, append = false) => {
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      const existing = newExecutions.get(taskId);
+      if (existing) {
+        newExecutions.set(taskId, {
+          ...existing,
+          streamingContent: append ? existing.streamingContent + content : content,
+          isStreaming: true,
+        });
+      }
+      return { executions: newExecutions };
+    });
+  },
+
+  clearStreamingContent: (taskId) => {
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      const existing = newExecutions.get(taskId);
+      if (existing) {
+        newExecutions.set(taskId, {
+          ...existing,
+          streamingContent: '',
+          isStreaming: false,
+        });
+      }
+      return { executions: newExecutions };
+    });
+  },
+
+  setIsStreaming: (taskId, isStreaming) => {
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      const existing = newExecutions.get(taskId);
+      if (existing) {
+        newExecutions.set(taskId, {
+          ...existing,
+          isStreaming,
+        });
+      }
+      return { executions: newExecutions };
+    });
+  },
+
+  setServerStatus: (taskId, status) => {
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      const existing = newExecutions.get(taskId);
+      if (existing) {
+        newExecutions.set(taskId, {
+          ...existing,
+          serverStatus: status,
+        });
+      }
+      return { executions: newExecutions };
+    });
+  },
+
+  cleanupExecution: (taskId) => {
+    const execution = get().executions.get(taskId);
+    if (!execution) return;
+
+    // Only cleanup if not running
+    if (execution.status === 'running') {
+      logger.warn('[ExecutionStore] Cannot cleanup running execution', { taskId });
+      return;
+    }
+
+    logger.info('[ExecutionStore] Cleaning up execution', { taskId });
+    set((state) => {
+      const newExecutions = new Map(state.executions);
+      newExecutions.delete(taskId);
+      return { executions: newExecutions };
+    });
+  },
+
+  // ============================================
+  // Selectors
+  // ============================================
+
+  isRunning: (taskId) => {
+    const execution = get().executions.get(taskId);
+    return execution?.status === 'running';
+  },
+
+  // Alias for backward compatibility
+  isTaskRunning: (taskId) => {
+    const execution = get().executions.get(taskId);
+    return execution?.status === 'running';
+  },
+
+  getExecution: (taskId) => {
+    return get().executions.get(taskId);
+  },
+
+  getRunningTaskIds: () => {
+    const { executions } = get();
+    return getRunningIdsWithCache(executions);
+  },
+
+  isMaxReached: () => {
+    const state = get();
+    return state.getRunningCount() >= state.maxConcurrent;
+  },
+
+  getRunningCount: () => {
+    const { executions } = get();
+    return Array.from(executions.values()).filter((e) => e.status === 'running').length;
+  },
+
+  canStartNew: () => {
+    return !get().isMaxReached();
+  },
+}));
 
 // Export store instance for direct access in non-React contexts
 export const executionStore = useExecutionStore;

@@ -12,7 +12,6 @@
  */
 
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
 import type { Task } from '@/types';
 
 interface UIState {
@@ -54,93 +53,69 @@ interface UIState {
   isEditing: (taskId: string) => boolean;
 }
 
-export const useUIStateStore = create<UIState>()(
-  devtools(
-    (set, get) => ({
+export const useUIStateStore = create<UIState>()((set, get) => ({
+  editingTaskId: null,
+  editingTitle: '',
+
+  // ============================================
+  // Task Editing Actions
+  // ============================================
+
+  startEditing: (task, e) => {
+    // Prevent event propagation if event is provided
+    if (e) {
+      e.stopPropagation();
+    }
+
+    set({
+      editingTaskId: task.id,
+      editingTitle: task.title,
+    });
+  },
+
+  setEditingTitle: (title) => {
+    set({ editingTitle: title });
+  },
+
+  cancelEditing: () => {
+    set({
       editingTaskId: null,
       editingTitle: '',
+    });
+  },
 
-      // ============================================
-      // Task Editing Actions
-      // ============================================
-
-      startEditing: (task, e) => {
-        // Prevent event propagation if event is provided
-        if (e) {
-          e.stopPropagation();
-        }
-
-        set(
-          {
-            editingTaskId: task.id,
-            editingTitle: task.title,
-          },
-          false,
-          'startEditing'
-        );
-      },
-
-      setEditingTitle: (title) => {
-        set({ editingTitle: title }, false, 'setEditingTitle');
-      },
-
-      cancelEditing: () => {
-        set(
-          {
-            editingTaskId: null,
-            editingTitle: '',
-          },
-          false,
-          'cancelEditing'
-        );
-      },
-
-      finishEditing: () => {
-        const state = get();
-        if (!state.editingTaskId || !state.editingTitle.trim()) {
-          // Cancel if no valid data
-          set(
-            {
-              editingTaskId: null,
-              editingTitle: '',
-            },
-            false,
-            'finishEditing:cancelled'
-          );
-          return null;
-        }
-
-        const result = {
-          taskId: state.editingTaskId,
-          title: state.editingTitle.trim(),
-        };
-
-        set(
-          {
-            editingTaskId: null,
-            editingTitle: '',
-          },
-          false,
-          'finishEditing:success'
-        );
-
-        return result;
-      },
-
-      // ============================================
-      // Selectors
-      // ============================================
-
-      isEditing: (taskId) => {
-        return get().editingTaskId === taskId;
-      },
-    }),
-    {
-      name: 'ui-state-store',
-      enabled: import.meta.env.DEV,
+  finishEditing: () => {
+    const state = get();
+    if (!state.editingTaskId || !state.editingTitle.trim()) {
+      // Cancel if no valid data
+      set({
+        editingTaskId: null,
+        editingTitle: '',
+      });
+      return null;
     }
-  )
-);
+
+    const result = {
+      taskId: state.editingTaskId,
+      title: state.editingTitle.trim(),
+    };
+
+    set({
+      editingTaskId: null,
+      editingTitle: '',
+    });
+
+    return result;
+  },
+
+  // ============================================
+  // Selectors
+  // ============================================
+
+  isEditing: (taskId) => {
+    return get().editingTaskId === taskId;
+  },
+}));
 
 // Export store instance for direct access in non-React contexts
 export const uiStateStore = useUIStateStore;

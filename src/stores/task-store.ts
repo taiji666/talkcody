@@ -14,7 +14,6 @@
  */
 
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
 import { logger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
 import { useExecutionStore } from '@/stores/execution-store';
@@ -357,479 +356,396 @@ interface TaskState {
   getLastUserMessage: (taskId: string) => UIMessage | null;
 }
 
-export const useTaskStore = create<TaskState>()(
-  devtools(
-    (set, get) => ({
-      tasks: [],
-      currentTaskId: null,
-      runningTaskUsage: new Map(),
-      messages: new Map(),
-      loadingTasks: false,
-      error: null,
-
-      // ============================================
-      // Task Actions
-      // ============================================
-
-      setTasks: (tasks) => {
-        set(
-          () => {
-            const sortedTasks = sortTasksByTimeline([...tasks]);
-            return { tasks: sortedTasks };
-          },
-          false,
-          'setTasks'
-        );
-      },
-
-      addTask: (task) => {
-        set(
-          (state) => {
-            const nextTasks = upsertTasks(state.tasks, [task]);
-            return { tasks: sortTasksByTimeline([...nextTasks]) };
-          },
-          false,
-          'addTask'
-        );
-      },
-
-      addTasks: (tasks) => {
-        set(
-          (state) => {
-            const nextTasks = upsertTasks(state.tasks, tasks);
-            return { tasks: sortTasksByTimeline([...nextTasks]) };
-          },
-          false,
-          'addTasks'
-        );
-      },
-
-      updateTask: (taskId, updates) => {
-        set(
-          (state) => {
-            const index = findTaskIndex(state.tasks, taskId);
-            if (index < 0) return state;
-
-            const nextTasks = [...state.tasks];
-            const task = nextTasks[index]!;
-            nextTasks[index] = { ...task, ...updates };
-
-            return { tasks: sortTasksByTimeline(nextTasks) };
-          },
-          false,
-          'updateTask'
-        );
-      },
-
-      removeTask: (taskId) => {
-        set(
-          (state) => {
-            const tasks = state.tasks.filter((task) => task.id !== taskId);
-            const messages = new Map(state.messages);
-            const runningTaskUsage = new Map(state.runningTaskUsage);
-
-            messages.delete(taskId);
-            runningTaskUsage.delete(taskId);
-            taskUsageCache.delete(taskId);
-
-            // Clear current task if it was deleted
-            const newCurrentTaskId = state.currentTaskId === taskId ? null : state.currentTaskId;
-
-            return {
-              tasks,
-              messages,
-              runningTaskUsage,
-              currentTaskId: newCurrentTaskId,
-            };
-          },
-          false,
-          'removeTask'
-        );
-      },
-
-      setCurrentTaskId: (taskId) => {
-        set({ currentTaskId: taskId }, false, 'setCurrentTaskId');
-      },
-
-      updateTaskUsage: (taskId, usage) => {
-        set(
-          (state) => {
-            const index = findTaskIndex(state.tasks, taskId);
-            if (index < 0) return state;
-
-            const runningTaskUsage = new Map(state.runningTaskUsage);
-            const existing = runningTaskUsage.get(taskId) || {
-              costDelta: 0,
-              inputTokensDelta: 0,
-              outputTokensDelta: 0,
-            };
-
-            const nextUsage: RunningTaskUsage = {
-              costDelta: existing.costDelta + (usage.costDelta ?? 0),
-              inputTokensDelta: existing.inputTokensDelta + (usage.inputTokensDelta ?? 0),
-              outputTokensDelta: existing.outputTokensDelta + (usage.outputTokensDelta ?? 0),
-              contextUsage: usage.contextUsage ?? existing.contextUsage,
-            };
-
-            runningTaskUsage.set(taskId, nextUsage);
-            return { runningTaskUsage };
-          },
-          false,
-          'updateTaskUsage'
-        );
-      },
-
-      flushRunningTaskUsage: (taskId) => {
-        set(
-          (state) => {
-            const index = findTaskIndex(state.tasks, taskId);
-            if (index < 0) return state;
-
-            const delta = state.runningTaskUsage.get(taskId);
-            if (!delta) return state;
-
-            const nextTasks = [...state.tasks];
-            const task = nextTasks[index]!;
-            nextTasks[index] = {
-              ...task,
-              cost: task.cost + delta.costDelta,
-              input_token: task.input_token + delta.inputTokensDelta,
-              output_token: task.output_token + delta.outputTokensDelta,
-              context_usage: delta.contextUsage ?? task.context_usage,
-            };
-
-            const runningTaskUsage = new Map(state.runningTaskUsage);
-            runningTaskUsage.delete(taskId);
-
-            return { tasks: sortTasksByTimeline(nextTasks), runningTaskUsage };
-          },
-          false,
-          'flushRunningTaskUsage'
-        );
-      },
-
-      clearRunningTaskUsage: (taskId) => {
-        set(
-          (state) => {
-            if (!state.runningTaskUsage.has(taskId)) return state;
-            const runningTaskUsage = new Map(state.runningTaskUsage);
-            runningTaskUsage.delete(taskId);
-            return { runningTaskUsage };
-          },
-          false,
-          'clearRunningTaskUsage'
-        );
-      },
-
-      updateTaskSettings: (taskId, settings) => {
-        set(
-          (state) => {
-            const index = findTaskIndex(state.tasks, taskId);
-            if (index < 0) return state;
-
-            const nextTasks = [...state.tasks];
-            const task = nextTasks[index]!;
-            const existingSettings: TaskSettings = task.settings ? JSON.parse(task.settings) : {};
-            nextTasks[index] = {
-              ...task,
-              settings: JSON.stringify({ ...existingSettings, ...settings }),
-            };
-            return { tasks: sortTasksByTimeline(nextTasks) };
-          },
-          false,
-          'updateTaskSettings'
-        );
-      },
-
-      // ============================================
-      // Message Actions
-      // ============================================
-
-      setMessages: (taskId, messages) => {
-        set(
-          (state) => {
-            const existingMessages = state.messages.get(taskId) || [];
-
-            const loadedIds = new Set(messages.map((m) => m.id));
-            const pendingMessages = existingMessages.filter((m) => !loadedIds.has(m.id));
-
-            const merged = [...messages, ...pendingMessages];
-            merged.sort(
-              (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-            );
-
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(taskId, merged);
-            return { messages: messagesMap };
-          },
-          false,
-          'setMessages'
-        );
-      },
-
-      addMessage: (taskId, message) => {
-        const messageId = message.id || generateId();
-        const fullMessage = { ...message, id: messageId };
-
-        set(
-          (state) => {
-            const existing = state.messages.get(taskId) || [];
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(taskId, [...existing, fullMessage]);
-
-            // Only update timestamp for user messages
-            const index = findTaskIndex(state.tasks, taskId);
-            if (index >= 0 && message.role === 'user') {
-              const nextTasks = [...state.tasks];
-              const task = nextTasks[index]!;
-              nextTasks[index] = {
-                ...task,
-                updated_at: Date.now(),
-                message_count: (task.message_count ?? 0) + 1,
-              };
-              return {
-                messages: messagesMap,
-                tasks: sortTasksByTimeline(nextTasks),
-              };
-            }
-
-            return {
-              messages: messagesMap,
-            };
-          },
-          false,
-          'addMessage'
-        );
-
-        return messageId;
-      },
-
-      updateMessage: (taskId, messageId, updates) => {
-        set(
-          (state) => {
-            const messages = state.messages.get(taskId);
-            if (!messages) return state;
-
-            const index = messages.findIndex((msg) => msg.id === messageId);
-            if (index < 0) return state;
-
-            const updatedMessages = [...messages];
-            updatedMessages[index] = { ...updatedMessages[index], ...updates } as UIMessage;
-
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(taskId, updatedMessages);
-            return { messages: messagesMap };
-          },
-          false,
-          'updateMessage'
-        );
-      },
-
-      updateMessageContent: (taskId, messageId, content, isStreaming = false) => {
-        set(
-          (state) => {
-            const messages = state.messages.get(taskId);
-            if (!messages) return state;
-
-            const index = messages.findIndex((msg) => msg.id === messageId);
-            if (index < 0) return state;
-
-            const updatedMessages = [...messages];
-            updatedMessages[index] = {
-              ...updatedMessages[index],
-              content,
-              isStreaming,
-            } as UIMessage;
-
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(taskId, updatedMessages);
-            return { messages: messagesMap };
-          },
-          false,
-          'updateMessageContent'
-        );
-      },
-
-      deleteMessage: (taskId, messageId) => {
-        set(
-          (state) => {
-            const messages = state.messages.get(taskId);
-            if (!messages) return state;
-
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(
-              taskId,
-              messages.filter((msg) => msg.id !== messageId)
-            );
-            return { messages: messagesMap };
-          },
-          false,
-          'deleteMessage'
-        );
-      },
-
-      deleteMessagesFromIndex: (taskId, index) => {
-        set(
-          (state) => {
-            const messages = state.messages.get(taskId);
-            if (!messages) return state;
-
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(taskId, messages.slice(0, index));
-            return { messages: messagesMap };
-          },
-          false,
-          'deleteMessagesFromIndex'
-        );
-      },
-
-      clearMessages: (taskId) => {
-        set(
-          (state) => {
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(taskId, []);
-            return { messages: messagesMap };
-          },
-          false,
-          'clearMessages'
-        );
-      },
-
-      stopStreaming: (taskId) => {
-        set(
-          (state) => {
-            const messages = state.messages.get(taskId);
-            if (!messages) return state;
-
-            const updatedMessages = messages.map((msg) => {
-              const updates: Partial<UIMessage> = {};
-
-              if ('isStreaming' in msg && msg.isStreaming) {
-                updates.isStreaming = false;
-              }
-              if ('renderDoingUI' in msg && msg.renderDoingUI) {
-                updates.renderDoingUI = false;
-              }
-
-              return Object.keys(updates).length > 0 ? { ...msg, ...updates } : msg;
-            });
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(taskId, updatedMessages);
-            return { messages: messagesMap };
-          },
-          false,
-          'stopStreaming'
-        );
-      },
-
-      addNestedToolMessage: (taskId, parentToolCallId, nestedMessage) => {
-        set(
-          (state) => {
-            const messages = state.messages.get(taskId);
-            if (!messages) {
-              logger.warn('[TaskStore] No messages found for task:', taskId);
-              return state;
-            }
-
-            let foundParent = false;
-            const updatedMessages = messages.map((msg) => {
-              // Find parent tool message by toolCallId (stored in content for tool messages)
-              const isToolMessage = msg.role === 'tool';
-              const toolContent =
-                isToolMessage && Array.isArray(msg.content) ? msg.content[0] : null;
-              const msgToolCallId = (toolContent as ToolMessageContent | null)?.toolCallId;
-
-              if (isToolMessage && msgToolCallId === parentToolCallId) {
-                foundParent = true;
-                const existingNested = msg.nestedTools || [];
-                const existingIndex = existingNested.findIndex((t) => t.id === nestedMessage.id);
-
-                let updatedNested: UIMessage[];
-                if (existingIndex >= 0) {
-                  updatedNested = [...existingNested];
-                  updatedNested[existingIndex] = nestedMessage;
-                } else {
-                  updatedNested = [...existingNested, nestedMessage];
-                }
-
-                return { ...msg, nestedTools: updatedNested };
-              }
-              return msg;
-            });
-
-            if (!foundParent) {
-              logger.warn('[TaskStore] Parent message NOT FOUND for toolCallId:', parentToolCallId);
-            }
-
-            const messagesMap = new Map(state.messages);
-            messagesMap.set(taskId, updatedMessages);
-            return { messages: messagesMap };
-          },
-          false,
-          'addNestedToolMessage'
-        );
-      },
-
-      // ============================================
-      // Loading State Actions
-      // ============================================
-
-      setLoadingTasks: (loading) => {
-        set({ loadingTasks: loading }, false, 'setLoadingTasks');
-      },
-
-      setError: (error) => {
-        set({ error }, false, 'setError');
-      },
-
-      // ============================================
-      // Selectors
-      // ============================================
-
-      getTask: (taskId) => {
-        const index = findTaskIndex(get().tasks, taskId);
-        if (index < 0) return undefined;
-
-        const task = get().tasks[index]!;
-        return mergeTaskUsage(taskId, task, get().runningTaskUsage.get(taskId));
-      },
-
-      getTaskList: () => {
-        const { tasks, runningTaskUsage } = get();
-        return getTaskListWithCache(tasks, runningTaskUsage);
-      },
-
-      getMessages: (taskId) => {
-        const messages = get().messages.get(taskId) || EMPTY_MESSAGES;
-        const execution = useExecutionStore.getState().getExecution(taskId);
-        const streamingContent = execution?.streamingContent;
-        const isRunning = execution?.status === 'running';
-
-        if (!streamingContent || !isRunning) {
-          streamingMessagesCache.delete(taskId);
-          return messages;
+export const useTaskStore = create<TaskState>()((set, get) => ({
+  tasks: [],
+  currentTaskId: null,
+  runningTaskUsage: new Map(),
+  messages: new Map(),
+  loadingTasks: false,
+  error: null,
+
+  // ============================================
+  // Task Actions
+  // ============================================
+
+  setTasks: (tasks) => {
+    set(() => {
+      const sortedTasks = sortTasksByTimeline([...tasks]);
+      return { tasks: sortedTasks };
+    });
+  },
+
+  addTask: (task) => {
+    set((state) => {
+      const nextTasks = upsertTasks(state.tasks, [task]);
+      return { tasks: sortTasksByTimeline([...nextTasks]) };
+    });
+  },
+
+  addTasks: (tasks) => {
+    set((state) => {
+      const nextTasks = upsertTasks(state.tasks, tasks);
+      return { tasks: sortTasksByTimeline([...nextTasks]) };
+    });
+  },
+
+  updateTask: (taskId, updates) => {
+    set((state) => {
+      const index = findTaskIndex(state.tasks, taskId);
+      if (index < 0) return state;
+
+      const nextTasks = [...state.tasks];
+      const task = nextTasks[index]!;
+      nextTasks[index] = { ...task, ...updates };
+
+      return { tasks: sortTasksByTimeline(nextTasks) };
+    });
+  },
+
+  removeTask: (taskId) => {
+    set((state) => {
+      const tasks = state.tasks.filter((task) => task.id !== taskId);
+      const messages = new Map(state.messages);
+      const runningTaskUsage = new Map(state.runningTaskUsage);
+
+      messages.delete(taskId);
+      runningTaskUsage.delete(taskId);
+      taskUsageCache.delete(taskId);
+
+      // Clear current task if it was deleted
+      const newCurrentTaskId = state.currentTaskId === taskId ? null : state.currentTaskId;
+
+      return {
+        tasks,
+        messages,
+        runningTaskUsage,
+        currentTaskId: newCurrentTaskId,
+      };
+    });
+  },
+
+  setCurrentTaskId: (taskId) => {
+    set({ currentTaskId: taskId });
+  },
+
+  updateTaskUsage: (taskId, usage) => {
+    set((state) => {
+      const index = findTaskIndex(state.tasks, taskId);
+      if (index < 0) return state;
+
+      const runningTaskUsage = new Map(state.runningTaskUsage);
+      const existing = runningTaskUsage.get(taskId) || {
+        costDelta: 0,
+        inputTokensDelta: 0,
+        outputTokensDelta: 0,
+      };
+
+      const nextUsage: RunningTaskUsage = {
+        costDelta: existing.costDelta + (usage.costDelta ?? 0),
+        inputTokensDelta: existing.inputTokensDelta + (usage.inputTokensDelta ?? 0),
+        outputTokensDelta: existing.outputTokensDelta + (usage.outputTokensDelta ?? 0),
+        contextUsage: usage.contextUsage ?? existing.contextUsage,
+      };
+
+      runningTaskUsage.set(taskId, nextUsage);
+      return { runningTaskUsage };
+    });
+  },
+
+  flushRunningTaskUsage: (taskId) => {
+    set((state) => {
+      const index = findTaskIndex(state.tasks, taskId);
+      if (index < 0) return state;
+
+      const delta = state.runningTaskUsage.get(taskId);
+      if (!delta) return state;
+
+      const nextTasks = [...state.tasks];
+      const task = nextTasks[index]!;
+      nextTasks[index] = {
+        ...task,
+        cost: task.cost + delta.costDelta,
+        input_token: task.input_token + delta.inputTokensDelta,
+        output_token: task.output_token + delta.outputTokensDelta,
+        context_usage: delta.contextUsage ?? task.context_usage,
+      };
+
+      const runningTaskUsage = new Map(state.runningTaskUsage);
+      runningTaskUsage.delete(taskId);
+
+      return { tasks: sortTasksByTimeline(nextTasks), runningTaskUsage };
+    });
+  },
+
+  clearRunningTaskUsage: (taskId) => {
+    set((state) => {
+      if (!state.runningTaskUsage.has(taskId)) return state;
+      const runningTaskUsage = new Map(state.runningTaskUsage);
+      runningTaskUsage.delete(taskId);
+      return { runningTaskUsage };
+    });
+  },
+
+  updateTaskSettings: (taskId, settings) => {
+    set((state) => {
+      const index = findTaskIndex(state.tasks, taskId);
+      if (index < 0) return state;
+
+      const nextTasks = [...state.tasks];
+      const task = nextTasks[index]!;
+      const existingSettings: TaskSettings = task.settings ? JSON.parse(task.settings) : {};
+      nextTasks[index] = {
+        ...task,
+        settings: JSON.stringify({ ...existingSettings, ...settings }),
+      };
+      return { tasks: sortTasksByTimeline(nextTasks) };
+    });
+  },
+
+  // ============================================
+  // Message Actions
+  // ============================================
+
+  setMessages: (taskId, messages) => {
+    set((state) => {
+      const existingMessages = state.messages.get(taskId) || [];
+
+      const loadedIds = new Set(messages.map((m) => m.id));
+      const pendingMessages = existingMessages.filter((m) => !loadedIds.has(m.id));
+
+      const merged = [...messages, ...pendingMessages];
+      merged.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(taskId, merged);
+      return { messages: messagesMap };
+    });
+  },
+
+  addMessage: (taskId, message) => {
+    const messageId = message.id || generateId();
+    const fullMessage = { ...message, id: messageId };
+
+    set((state) => {
+      const existing = state.messages.get(taskId) || [];
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(taskId, [...existing, fullMessage]);
+
+      // Only update timestamp for user messages
+      const index = findTaskIndex(state.tasks, taskId);
+      if (index >= 0 && message.role === 'user') {
+        const nextTasks = [...state.tasks];
+        const task = nextTasks[index]!;
+        nextTasks[index] = {
+          ...task,
+          updated_at: Date.now(),
+          message_count: (task.message_count ?? 0) + 1,
+        };
+        return {
+          messages: messagesMap,
+          tasks: sortTasksByTimeline(nextTasks),
+        };
+      }
+
+      return {
+        messages: messagesMap,
+      };
+    });
+
+    return messageId;
+  },
+
+  updateMessage: (taskId, messageId, updates) => {
+    set((state) => {
+      const messages = state.messages.get(taskId);
+      if (!messages) return state;
+
+      const index = messages.findIndex((msg) => msg.id === messageId);
+      if (index < 0) return state;
+
+      const updatedMessages = [...messages];
+      updatedMessages[index] = { ...updatedMessages[index], ...updates } as UIMessage;
+
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(taskId, updatedMessages);
+      return { messages: messagesMap };
+    });
+  },
+
+  updateMessageContent: (taskId, messageId, content, isStreaming = false) => {
+    set((state) => {
+      const messages = state.messages.get(taskId);
+      if (!messages) return state;
+
+      const index = messages.findIndex((msg) => msg.id === messageId);
+      if (index < 0) return state;
+
+      const updatedMessages = [...messages];
+      updatedMessages[index] = {
+        ...updatedMessages[index],
+        content,
+        isStreaming,
+      } as UIMessage;
+
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(taskId, updatedMessages);
+      return { messages: messagesMap };
+    });
+  },
+
+  deleteMessage: (taskId, messageId) => {
+    set((state) => {
+      const messages = state.messages.get(taskId);
+      if (!messages) return state;
+
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(
+        taskId,
+        messages.filter((msg) => msg.id !== messageId)
+      );
+      return { messages: messagesMap };
+    });
+  },
+
+  deleteMessagesFromIndex: (taskId, index) => {
+    set((state) => {
+      const messages = state.messages.get(taskId);
+      if (!messages) return state;
+
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(taskId, messages.slice(0, index));
+      return { messages: messagesMap };
+    });
+  },
+
+  clearMessages: (taskId) => {
+    set((state) => {
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(taskId, []);
+      return { messages: messagesMap };
+    });
+  },
+
+  stopStreaming: (taskId) => {
+    set((state) => {
+      const messages = state.messages.get(taskId);
+      if (!messages) return state;
+
+      const updatedMessages = messages.map((msg) => {
+        const updates: Partial<UIMessage> = {};
+
+        if ('isStreaming' in msg && msg.isStreaming) {
+          updates.isStreaming = false;
+        }
+        if ('renderDoingUI' in msg && msg.renderDoingUI) {
+          updates.renderDoingUI = false;
         }
 
-        return mergeStreamingContent(taskId, messages, streamingContent);
-      },
+        return Object.keys(updates).length > 0 ? { ...msg, ...updates } : msg;
+      });
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(taskId, updatedMessages);
+      return { messages: messagesMap };
+    });
+  },
 
-      findMessageIndex: (taskId, messageId) => {
-        const messages = get().messages.get(taskId) || [];
-        return messages.findIndex((msg) => msg.id === messageId);
-      },
+  addNestedToolMessage: (taskId, parentToolCallId, nestedMessage) => {
+    set((state) => {
+      const messages = state.messages.get(taskId);
+      if (!messages) {
+        logger.warn('[TaskStore] No messages found for task:', taskId);
+        return state;
+      }
 
-      getLastUserMessage: (taskId) => {
-        const messages = get().messages.get(taskId) || [];
-        const userMessages = messages.filter((msg) => msg.role === 'user');
-        return userMessages.length > 0 ? userMessages[userMessages.length - 1] : null;
-      },
-    }),
-    {
-      name: 'task-store',
-      enabled: import.meta.env.DEV,
+      let foundParent = false;
+      const updatedMessages = messages.map((msg) => {
+        // Find parent tool message by toolCallId (stored in content for tool messages)
+        const isToolMessage = msg.role === 'tool';
+        const toolContent = isToolMessage && Array.isArray(msg.content) ? msg.content[0] : null;
+        const msgToolCallId = (toolContent as ToolMessageContent | null)?.toolCallId;
+
+        if (isToolMessage && msgToolCallId === parentToolCallId) {
+          foundParent = true;
+          const existingNested = msg.nestedTools || [];
+          const existingIndex = existingNested.findIndex((t) => t.id === nestedMessage.id);
+
+          let updatedNested: UIMessage[];
+          if (existingIndex >= 0) {
+            updatedNested = [...existingNested];
+            updatedNested[existingIndex] = nestedMessage;
+          } else {
+            updatedNested = [...existingNested, nestedMessage];
+          }
+
+          return { ...msg, nestedTools: updatedNested };
+        }
+        return msg;
+      });
+
+      if (!foundParent) {
+        logger.warn('[TaskStore] Parent message NOT FOUND for toolCallId:', parentToolCallId);
+      }
+
+      const messagesMap = new Map(state.messages);
+      messagesMap.set(taskId, updatedMessages);
+      return { messages: messagesMap };
+    });
+  },
+
+  // ============================================
+  // Loading State Actions
+  // ============================================
+
+  setLoadingTasks: (loading) => {
+    set({ loadingTasks: loading });
+  },
+
+  setError: (error) => {
+    set({ error });
+  },
+
+  // ============================================
+  // Selectors
+  // ============================================
+
+  getTask: (taskId) => {
+    const index = findTaskIndex(get().tasks, taskId);
+    if (index < 0) return undefined;
+
+    const task = get().tasks[index]!;
+    return mergeTaskUsage(taskId, task, get().runningTaskUsage.get(taskId));
+  },
+
+  getTaskList: () => {
+    const { tasks, runningTaskUsage } = get();
+    return getTaskListWithCache(tasks, runningTaskUsage);
+  },
+
+  getMessages: (taskId) => {
+    const messages = get().messages.get(taskId) || EMPTY_MESSAGES;
+    const execution = useExecutionStore.getState().getExecution(taskId);
+    const streamingContent = execution?.streamingContent;
+    const isRunning = execution?.status === 'running';
+
+    if (!streamingContent || !isRunning) {
+      streamingMessagesCache.delete(taskId);
+      return messages;
     }
-  )
-);
+
+    return mergeStreamingContent(taskId, messages, streamingContent);
+  },
+
+  findMessageIndex: (taskId, messageId) => {
+    const messages = get().messages.get(taskId) || [];
+    return messages.findIndex((msg) => msg.id === messageId);
+  },
+
+  getLastUserMessage: (taskId) => {
+    const messages = get().messages.get(taskId) || [];
+    const userMessages = messages.filter((msg) => msg.role === 'user');
+    return userMessages.length > 0 ? (userMessages[userMessages.length - 1] ?? null) : null;
+  },
+}));
 
 // Export store instance for direct access in non-React contexts
 export const taskStore = useTaskStore;
