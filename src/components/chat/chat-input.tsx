@@ -57,7 +57,6 @@ interface ChatInputProps {
   input: string;
   onInputChange: ChangeEventHandler<HTMLTextAreaElement>;
   onSubmit: (e: React.FormEvent, attachments?: MessageAttachment[]) => void;
-  onCommandExecute?: (command: Command, args: string) => void;
   isLoading: boolean;
   status: ChatStatus;
   selectedFile?: string | null;
@@ -77,7 +76,6 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       input,
       onInputChange,
       onSubmit,
-      onCommandExecute,
       isLoading,
       status,
       selectedFile,
@@ -401,11 +399,6 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             textareaRef.current.focus();
           }
         }, 0);
-
-        // Execute command if callback is provided
-        if (onCommandExecute) {
-          onCommandExecute(command, rawArgs);
-        }
       }
 
       setShowCommandPicker(false);

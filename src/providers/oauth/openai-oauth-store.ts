@@ -180,6 +180,11 @@ export const useOpenAIOAuthStore = create<OpenAIOAuthStore>((set, get) => ({
         expectedState: oauthResult.state,
       });
 
+      // Check if we got a different port than default (port was in use)
+      if (port !== 1455) {
+        logger.warn('[OpenAIOAuth] Default port was in use, using alternative port:', port);
+      }
+
       logger.info('[OpenAIOAuth] Callback server started on port:', port);
 
       // Listen for callback event

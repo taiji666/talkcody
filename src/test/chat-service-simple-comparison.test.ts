@@ -53,6 +53,7 @@ vi.mock('@/stores/settings-store', () => ({
   useSettingsStore: {
     getState: vi.fn(() => ({
       language: 'en',
+      getReasoningEffort: vi.fn(() => 'medium'),
     })),
   },
 }));

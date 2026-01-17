@@ -48,6 +48,7 @@ export const mockSettingsStore = {
       language: 'en',
       theme: 'dark',
       assistantId: 'planner',
+      getReasoningEffort: vi.fn(() => 'medium'),
     })),
     subscribe: vi.fn(),
     setState: vi.fn(),

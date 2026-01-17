@@ -204,6 +204,14 @@ const mockTranslations = {
       disabledTooltip: 'Manual review: AI will ask for approval before applying edits',
       toggleFailed: 'Failed to update auto-approve setting',
     },
+    reasoningEffort: {
+      title: 'Reasoning Effort',
+      description: 'Control how much reasoning the model performs before responding. Higher effort uses more tokens for thinking.',
+      currentEffort: 'Current effort',
+      hint: 'Higher reasoning effort uses more tokens but may improve complex task performance.',
+      success: 'Reasoning effort updated',
+      failed: 'Failed to update reasoning effort',
+    },
     planMode: {
       label: 'Plan Mode',
       title: 'Plan Mode',

@@ -160,6 +160,14 @@ const zh: LocaleDefinition = {
       disabledTooltip: '人工审核：AI 将在应用编辑前请求批准',
       toggleFailed: '更新自动批准设置失败',
     },
+    reasoningEffort: {
+      title: '推理强度',
+      description: '控制模型在响应前进行多少推理。较高的强度会使用更多 tokens 进行思考。',
+      currentEffort: '当前强度',
+      hint: '较高的推理强度会消耗更多 tokens，但可能会提高复杂任务的性能。',
+      success: '推理强度已更新',
+      failed: '更新推理强度失败',
+    },
     toolbar: {
       model: '模型',
       planMode: '计划模式',
@@ -253,6 +261,8 @@ const zh: LocaleDefinition = {
       pasteCode: '请输入授权码',
       pasteCodeLabel: '授权码',
       codePlaceholder: '在此粘贴授权码...',
+      portInUse: '默认端口正在使用中，正在尝试使用其他端口...',
+      portInUseTitle: '端口被占用',
       connect: '连接',
       connected: '已连接到 Claude',
       connectedWithPlan: '已连接 Claude Pro/Max',
@@ -260,6 +270,7 @@ const zh: LocaleDefinition = {
       disconnected: '已断开与 Claude 的连接',
       useApiKeyInstead: '使用 API 密钥',
       connectionFailed: '连接失败。请重试。',
+      connectionFailedWithPort: '无法启动 OAuth 服务器。请重试或使用下方的手动代码输入。',
       tokenRefreshFailed: '会话已过期。请重新连接。',
       disclaimer: {
         dialogTitle: '使用条款与免责声明',
@@ -280,6 +291,8 @@ const zh: LocaleDefinition = {
       step2: '步骤 2：粘贴回调 URL',
       step2Hint: '授权完成后，复制浏览器地址栏中的完整 URL（页面会显示"连接失败"，这是正常的）',
       codePlaceholder: '在此粘贴完整 URL（例如：http://localhost:1455/auth/callback?code=...）',
+      portInUse: '默认端口正在使用中，正在尝试使用其他端口...',
+      portInUseTitle: '端口被占用',
       connect: '连接',
       connected: '已连接到 ChatGPT',
       connectedWithPlan: '已连接 ChatGPT Plus/Pro',
@@ -287,6 +300,7 @@ const zh: LocaleDefinition = {
       disconnected: '已断开与 ChatGPT 的连接',
       pasteCode: '请粘贴回调 URL',
       connectionFailed: '连接失败。请重试。',
+      connectionFailedWithPort: '无法启动 OAuth 服务器。请重试或使用下方的手动代码输入。',
       tokenRefreshFailed: '会话已过期。请重新连接。',
       redirectUriNote: '注意：回调地址是',
       redirectUriHint:
@@ -942,6 +956,13 @@ const zh: LocaleDefinition = {
       generic: '发生错误',
       tryAgain: '请重试',
     },
+  },
+
+  KeepAwake: {
+    enabled: '任务运行期间已阻止系统休眠',
+    disabled: '已禁用休眠预防',
+    error: '阻止系统休眠失败',
+    platformNotSupported: '此平台不支持休眠预防',
   },
 
   MCPServers: {

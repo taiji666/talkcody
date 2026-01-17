@@ -1,5 +1,5 @@
 {
-  "version": "2026-01-07T06:55:50.687Z",
+  "version": "2026-01-16T02:43:13.661Z",
   "models": {
     "gpt-5-nano": {
       "name": "GPT-5 Nano",
@@ -109,30 +109,20 @@
       },
       "context_length": 400000
     },
-    "gpt-5.2-codex-medium": {
-      "name": "GPT-5.2-Codex-Medium",
+    "gpt-5.2-codex": {
+      "name": "GPT-5.2-Codex",
       "imageInput": true,
       "providers": [
-        "openai"
+        "aiGateway",
+        "openai",
+        "github_copilot",
+        "openRouter"
       ],
       "providerMappings": {
-        "openai": "gpt-5.2-codex-medium"
-      },
-      "pricing": {
-        "input": "0.00000175",
-        "output": "0.000014",
-        "cachedInput": "0.000000175"
-      },
-      "context_length": 400000
-    },
-    "gpt-5.2-codex-high": {
-      "name": "GPT-5.2-Codex-High",
-      "imageInput": true,
-      "providers": [
-        "openai"
-      ],
-      "providerMappings": {
-        "openai": "gpt-5.2-codex-high"
+        "openai": "gpt-5.2-codex",
+        "github_copilot": "gpt-5.2-codex",
+        "aiGateway": "openai/gpt-5.2-codex",
+        "openRouter": "openai/gpt-5.2-codex"
       },
       "pricing": {
         "input": "0.00000175",
@@ -427,8 +417,9 @@
         "ollama": "glm-4.7:cloud"
       },
       "pricing": {
-        "input": "0.0000006",
-        "output": "0.0000022"
+        "input": "0.00000043",
+        "output": "0.00000175",
+        "cachedInput": "0.00000008"
       },
       "context_length": 202752
     },
@@ -450,10 +441,11 @@
         "openRouter": "minimax/minimax-m2.1"
       },
       "pricing": {
-        "input": "0.0000003",
-        "output": "0.0000012"
+        "input": "0.00000028",
+        "output": "0.0000012",
+        "cachedInput": "0.00000014"
       },
-      "context_length": 204800
+      "context_length": 196608
     },
     "gpt-oss:20b": {
       "name": "GPT-OSS 20B (Local)",

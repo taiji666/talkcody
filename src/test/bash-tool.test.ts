@@ -14,6 +14,11 @@ vi.mock('@/stores/settings-store', () => ({
   settingsManager: {
     getCurrentRootPath: vi.fn(() => '/test/root'),
   },
+  useSettingsStore: {
+    getState: vi.fn(() => ({
+      getReasoningEffort: vi.fn(() => 'medium'),
+    })),
+  },
 }));
 
 vi.mock('@/services/workspace-root-service', () => ({

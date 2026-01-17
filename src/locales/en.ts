@@ -165,6 +165,15 @@ const en: LocaleDefinition = {
       disabledTooltip: 'Manual review: AI will ask for approval before applying edits',
       toggleFailed: 'Failed to update auto-approve setting',
     },
+    reasoningEffort: {
+      title: 'Reasoning Effort',
+      description:
+        'Control how much reasoning the model performs before responding. Higher effort uses more tokens for thinking.',
+      currentEffort: 'Current effort',
+      hint: 'Higher reasoning effort uses more tokens but may improve complex task performance.',
+      success: 'Reasoning effort updated',
+      failed: 'Failed to update reasoning effort',
+    },
     toolbar: {
       model: 'Model',
       planMode: 'Plan Mode',
@@ -261,6 +270,8 @@ const en: LocaleDefinition = {
       pasteCode: 'Please enter the authorization code',
       pasteCodeLabel: 'Authorization Code',
       codePlaceholder: 'Paste the code here...',
+      portInUse: 'The default port is in use. Trying an alternative port...',
+      portInUseTitle: 'Port in use',
       connect: 'Connect',
       connected: 'Connected to Claude',
       connectedWithPlan: 'Connected with Claude Pro/Max',
@@ -268,6 +279,8 @@ const en: LocaleDefinition = {
       disconnected: 'Disconnected from Claude',
       useApiKeyInstead: 'Use API key instead',
       connectionFailed: 'Connection failed. Please try again.',
+      connectionFailedWithPort:
+        'Could not start OAuth server. Please try again or use manual code entry below.',
       tokenRefreshFailed: 'Session expired. Please reconnect.',
       disclaimer: {
         dialogTitle: 'Terms of Use & Disclaimer',
@@ -291,6 +304,8 @@ const en: LocaleDefinition = {
         'After authorization, copy the full URL from browser address bar (it will show "connection failed" but that\'s OK)',
       codePlaceholder:
         'Paste the full URL here (e.g., http://localhost:1455/auth/callback?code=...)',
+      portInUse: 'The default port is in use. Trying an alternative port...',
+      portInUseTitle: 'Port in use',
       connect: 'Connect',
       connected: 'Connected to ChatGPT',
       connectedWithPlan: 'Connected with ChatGPT Plus/Pro',
@@ -298,6 +313,8 @@ const en: LocaleDefinition = {
       disconnected: 'Disconnected from ChatGPT',
       pasteCode: 'Please paste the callback URL',
       connectionFailed: 'Connection failed. Please try again.',
+      connectionFailedWithPort:
+        'Could not start OAuth server. Please try again or use manual code entry below.',
       tokenRefreshFailed: 'Session expired. Please reconnect.',
       redirectUriNote: 'Note: The redirect URI is',
       redirectUriHint:
@@ -971,6 +988,13 @@ const en: LocaleDefinition = {
       generic: 'An error occurred',
       tryAgain: 'Please try again',
     },
+  },
+
+  KeepAwake: {
+    enabled: 'Sleep prevented while tasks are running',
+    disabled: 'Sleep prevention disabled',
+    error: 'Failed to prevent system sleep',
+    platformNotSupported: 'Sleep prevention not supported on this platform',
   },
 
   MCPServers: {

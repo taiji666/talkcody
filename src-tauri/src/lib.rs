@@ -12,6 +12,7 @@ mod file_watcher;
 mod git;
 mod glob;
 mod http_proxy;
+mod keep_awake;
 mod lint;
 mod list_files;
 mod lsp;
@@ -90,6 +91,7 @@ struct Payload {
 struct AppState {
     file_watcher: Mutex<Option<FileWatcher>>,
     window_registry: WindowRegistry,
+    keep_awake: keep_awake::KeepAwakeStateWrapper,
 }
 
 #[tauri::command]
@@ -630,6 +632,7 @@ pub fn run() {
         .manage(AppState {
             file_watcher: Mutex::new(None),
             window_registry: WindowRegistry::new(),
+            keep_awake: keep_awake::KeepAwakeStateWrapper::new(),
         })
         .manage(AnalyticsState::new())
         .plugin(tauri_plugin_deep_link::init())
@@ -701,6 +704,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_keepawake::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets([
@@ -809,6 +813,10 @@ pub fn run() {
             lsp::lsp_download_server,
             oauth_callback_server::start_oauth_callback_server,
             device_id::get_device_id,
+            keep_awake::keep_awake_acquire,
+            keep_awake::keep_awake_release,
+            keep_awake::keep_awake_get_ref_count,
+            keep_awake::keep_awake_is_preventing,
         ])
         .on_window_event(|window, event| {
             // Clean up resources when main window is destroyed

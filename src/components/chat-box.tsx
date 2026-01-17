@@ -299,7 +299,7 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
             : 'Sorry, I encountered some issues. Please try again later.';
         setError(errorMessage);
 
-        // Note: Error message display is handled by the onError callback passed to llmService
+        // Note: Error message display is handled by the onError callback passed to executionService
         // to avoid duplicate error messages in the chatbox
 
         onError?.(errorMessage);
@@ -413,6 +413,17 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
       const userMessage = input.trim();
       setInput('');
 
+      // Check if the message is a command (starts with '/')
+      if (userMessage.startsWith('/')) {
+        const parsedCommand = commandExecutor.parseCommand(userMessage);
+        if (parsedCommand.isValid && parsedCommand.command) {
+          // Execute command directly without going through processMessage
+          await executeCommand(parsedCommand.command, parsedCommand.rawArgs);
+          return;
+        }
+      }
+
+      // If not a command, process as a normal message
       await processMessage(userMessage, attachments);
     };
 
@@ -437,8 +448,8 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
       }
     };
 
-    // Handle command execution
-    const handleCommandExecute = async (command: Command, rawArgs: string) => {
+    // Execute a command with the given arguments
+    const executeCommand = async (command: Command, rawArgs: string) => {
       try {
         // Build command context
         const context: CommandContext = {
@@ -454,16 +465,12 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
               onTaskStart('', '');
             }
           },
-          showNotification: (message: string, type = 'info') => {
-            toast[type](message);
-          },
         };
 
-        // Execute the command
-        const result: CommandResult = await commandExecutor.executeFromInput(
-          `/${command.name} ${rawArgs}`.trim(),
-          context
-        );
+        // Execute the command directly (already parsed)
+        // Build args object: use _raw for raw string args, or empty object if no args expected
+        const args: Record<string, unknown> = rawArgs ? { _raw: rawArgs } : {};
+        const result: CommandResult = await command.executor(args, context);
 
         // Handle the result
         if (result.success) {
@@ -549,7 +556,6 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
           isLoading={isLoading}
           onInputChange={handleInputChange}
           onSubmit={handleSubmit}
-          onCommandExecute={handleCommandExecute}
           repositoryPath={repositoryPath}
           selectedFile={selectedFile}
           status={status}

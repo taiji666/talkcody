@@ -1,12 +1,10 @@
 // src/services/commands/built-in-commands.ts
 
 import { z } from 'zod';
-import type { Command } from '@/types/command';
+import { compactTaskContext } from '@/services/context/manual-context-compaction';
+import type { Command, CommandContext } from '@/types/command';
 import { CommandCategory, CommandType } from '@/types/command';
 
-/**
- * Get all built-in commands
- */
 export async function getBuiltInCommands(): Promise<Command[]> {
   const commands: Command[] = [
     // /new - Create new task
@@ -44,53 +42,23 @@ export async function getBuiltInCommands(): Promise<Command[]> {
       updatedAt: new Date(),
     },
 
-    //     // /pr-review - Review a pull request
-    //     {
-    //       id: 'pr-review',
-    //       name: 'pr-review',
-    //       description: 'Review and analyze a GitHub pull request',
-    //       category: CommandCategory.GIT,
-    //       type: CommandType.AI_PROMPT,
-    //       parameters: [
-    //         {
-    //           name: 'url',
-    //           description: 'GitHub PR URL or PR number',
-    //           required: true,
-    //           type: 'url',
-    //         },
-    //       ],
-    //       parametersSchema: z.object({
-    //         url: z.string().min(1, 'PR URL or number is required'),
-    //       }),
-    //       executor: async (args, _context) => {
-    //         const prIdentifier = args.url;
-
-    //         const aiMessage = `Please review the GitHub pull request: ${prIdentifier}.
-
-    // Use the appropriate tools to:
-    // 1. Fetch the PR details and changes
-    // 2. Analyze the code changes for quality, security, and best practices
-    // 3. Check for potential issues or improvements
-    // 4. Provide constructive feedback and suggestions
-    // 5. Summarize the overall quality and readiness of the PR
-
-    // Focus on code quality, potential bugs, security issues, performance implications, and adherence to best practices.`;
-
-    //         return {
-    //           success: true,
-    //           message: `PR review initiated for: ${prIdentifier}`,
-    //           continueProcessing: true,
-    //           aiMessage,
-    //         };
-    //       },
-    //       isBuiltIn: true,
-    //       enabled: true,
-    //       icon: 'Search',
-    //       aliases: ['review'],
-    //       examples: ['/pr-review https://github.com/owner/repo/pull/123', '/pr-review 123'],
-    //       createdAt: new Date(),
-    //       updatedAt: new Date(),
-    //     },
+    // /compact - Manually trigger context compaction for current task
+    {
+      id: 'compact-task',
+      name: 'compact',
+      description: 'Manually compact the current task context',
+      category: CommandCategory.TASK,
+      type: CommandType.ACTION,
+      executor: async (_args, context) => executeCompactCommand(context),
+      isBuiltIn: true,
+      enabled: true,
+      icon: 'Archive',
+      aliases: ['compress'],
+      requiresTask: true,
+      examples: ['/compact'],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
 
     // /init - Initialize project with AGENTS.md
     {
@@ -140,4 +108,29 @@ export async function getBuiltInCommands(): Promise<Command[]> {
   ];
 
   return commands;
+}
+
+/**
+ * Execute compact command logic directly
+ */
+async function executeCompactCommand(
+  context: CommandContext
+): Promise<{ success: boolean; message: string; error?: string }> {
+  const { taskId } = context;
+
+  if (!taskId) {
+    return {
+      success: false,
+      message: 'No active task - cannot compact context',
+      error: 'No active task - cannot compact context',
+    };
+  }
+
+  const result = await compactTaskContext(taskId);
+
+  return {
+    success: result.success,
+    message: result.message,
+    error: result.error,
+  };
 }

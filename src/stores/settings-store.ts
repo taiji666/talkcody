@@ -30,6 +30,7 @@ interface SettingsState {
   model: string;
   assistantId: string;
   is_think: boolean;
+  reasoning_effort: string;
   ai_completion_enabled: boolean;
   get_context_tool_model: string;
   is_plan_mode_enabled: boolean;
@@ -102,6 +103,8 @@ interface SettingsActions {
   setModel: (model: string) => Promise<void>;
   setAssistantId: (assistantId: string) => Promise<void>;
   setIsThink: (isThink: boolean) => Promise<void>;
+  setReasoningEffort: (effort: string) => Promise<void>;
+  getReasoningEffort: () => string;
   setAICompletionEnabled: (enabled: boolean) => Promise<void>;
   setGetContextToolModel: (model: string) => Promise<void>;
   setPlanModeEnabled: (enabled: boolean) => Promise<void>;
@@ -206,6 +209,7 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized
   model: '',
   assistantId: 'planner',
   is_think: false,
+  reasoning_effort: 'medium',
   ai_completion_enabled: false,
   get_context_tool_model: GROK_CODE_FAST,
   is_plan_mode_enabled: false,
@@ -404,6 +408,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         'ai_completion_enabled',
         'get_context_tool_model',
         'is_plan_mode_enabled',
+        'reasoning_effort',
         'project',
         'current_root_path',
         'custom_tools_dir',
@@ -474,6 +479,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         model: rawSettings.model || '',
         assistantId: rawSettings.assistantId || 'planner',
         is_think: rawSettings.is_think === 'true',
+        reasoning_effort: rawSettings.reasoning_effort || 'medium',
         ai_completion_enabled: rawSettings.ai_completion_enabled === 'true',
         get_context_tool_model: rawSettings.get_context_tool_model || GROK_CODE_FAST,
         is_plan_mode_enabled: rawSettings.is_plan_mode_enabled === 'true',
@@ -576,6 +582,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setIsThink: async (isThink: boolean) => {
     await settingsDb.set('is_think', isThink.toString());
     set({ is_think: isThink });
+  },
+
+  setReasoningEffort: async (effort: string) => {
+    await settingsDb.set('reasoning_effort', effort);
+    set({ reasoning_effort: effort });
   },
 
   setAICompletionEnabled: async (enabled: boolean) => {
@@ -958,6 +969,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     return get().is_think;
   },
 
+  getReasoningEffort: () => {
+    return get().reasoning_effort || 'medium';
+  },
+
   getCurrentRootPath: () => {
     return get().current_root_path;
   },
@@ -991,6 +1006,8 @@ export const settingsManager = {
   setApiKey: (apiKey: string) => useSettingsStore.getState().set('apiKey', apiKey),
   setProject: (project: string) => useSettingsStore.getState().setProject(project),
   setIsThink: (isThink: boolean) => useSettingsStore.getState().setIsThink(isThink),
+  setReasoningEffort: (effort: string) => useSettingsStore.getState().setReasoningEffort(effort),
+  getReasoningEffort: () => useSettingsStore.getState().getReasoningEffort(),
   setCurrentRootPath: (rootPath: string) =>
     useSettingsStore.getState().setCurrentRootPath(rootPath),
   setCurrentProjectId: (projectId: string) =>

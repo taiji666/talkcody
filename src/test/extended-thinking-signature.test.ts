@@ -11,7 +11,7 @@ import { StreamProcessor } from '@/services/agents/stream-processor';
 // Mock the settings store
 vi.mock('@/stores/settings-store', () => ({
   useSettingsStore: {
-    getState: () => ({ language: 'en' }),
+    getState: () => ({ language: 'en', getReasoningEffort: vi.fn(() => 'medium') }),
   },
 }));
 

@@ -38,6 +38,11 @@ vi.mock('@/stores/settings-store', () => ({
     getApiKeysSync: vi.fn(),
     setApiKeys: vi.fn(),
   },
+  useSettingsStore: {
+    getState: vi.fn(() => ({
+      getReasoningEffort: vi.fn(() => 'medium'),
+    })),
+  },
 }));
 
 describe('BYOK Implementation', () => {

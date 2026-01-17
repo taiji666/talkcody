@@ -23,9 +23,24 @@ const DEFAULT_PORT: u16 = 1455;
 const CALLBACK_PATH: &str = "/auth/callback";
 const SERVER_TIMEOUT_SECS: u64 = 300; // 5 minutes timeout
 
+// Port range for fallback (from DEFAULT_PORT to DEFAULT_PORT + 20)
+const PORT_RANGE_START: u16 = 1455;
+const PORT_RANGE_END: u16 = 1475;
+
 /// Check if a port is available
 fn is_port_available(port: u16) -> bool {
     TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
+/// Find an available port starting from the default port
+/// Returns the first available port in the range [PORT_RANGE_START, PORT_RANGE_END]
+fn find_available_port() -> Option<u16> {
+    for port in PORT_RANGE_START..=PORT_RANGE_END {
+        if is_port_available(port) {
+            return Some(port);
+        }
+    }
+    None
 }
 
 /// Generate success HTML page
@@ -249,15 +264,21 @@ pub async fn start_oauth_callback_server(
 ) -> Result<u16, String> {
     log::info!("Starting OAuth callback server...");
 
-    // Check if default port is available
-    if !is_port_available(DEFAULT_PORT) {
-        return Err(format!(
-            "Port {} is in use. Please close the application using this port and try again.",
-            DEFAULT_PORT
-        ));
-    }
-
-    let port = DEFAULT_PORT;
+    // Check if default port is available, otherwise try to find another port
+    let port = if is_port_available(DEFAULT_PORT) {
+        DEFAULT_PORT
+    } else {
+        // Try to find an available port in the fallback range
+        match find_available_port() {
+            Some(available_port) => available_port,
+            None => {
+                return Err(format!(
+                    "All ports from {} to {} are in use. Please close other applications and try again, or use manual code entry instead.",
+                    PORT_RANGE_START, PORT_RANGE_END
+                ));
+            }
+        }
+    };
     let shutdown_flag = Arc::new(AtomicBool::new(false));
     let shutdown_flag_clone = shutdown_flag.clone();
 

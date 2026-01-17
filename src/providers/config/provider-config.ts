@@ -11,7 +11,6 @@ import type { ProviderRegistry } from '@/types';
 import { createTalkCodyProvider } from '../core/talkcody-provider';
 
 export const PROVIDER_CONFIGS: ProviderRegistry = {
-  // TalkCody Free Provider
   talkcody: {
     id: 'talkcody',
     name: 'TalkCody Free',

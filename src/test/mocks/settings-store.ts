@@ -43,6 +43,7 @@ export const createMockUseSettingsStore = (
   getState: vi.fn(() => ({
     language: overrides.language ?? DEFAULT_LANGUAGE,
     theme: overrides.theme ?? 'dark',
+    getReasoningEffort: vi.fn(() => 'medium'),
     ...overrides.settings,
   })),
   subscribe: vi.fn(),

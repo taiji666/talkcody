@@ -3,7 +3,7 @@
 // Reference: opencode-openai-codex-auth/lib/request/request-transformer.ts
 
 import { logger } from '@/lib/logger';
-
+import { useSettingsStore } from '@/stores/settings-store';
 import codexInstructions from './codex-instructions.md?raw';
 
 /**
@@ -60,21 +60,18 @@ export function normalizeModel(model: string | undefined): string {
 
 export function getReasoningConfig(modelName: string | undefined): ReasoningConfig {
   const normalizedName = modelName?.toLowerCase() ?? '';
-
-  const isGpt52CodexHigh = normalizedName === 'gpt-5.2-codex-high';
   const isGpt52Codex = normalizedName === 'gpt-5.2-codex';
   const isCodexMax = normalizedName === 'gpt-5.1-codex-max';
 
   // GPT 5.2, GPT 5.2 Codex, and Codex Max support xhigh reasoning
-  const supportsXhigh = isGpt52CodexHigh || isGpt52Codex || isCodexMax;
+  const supportsXhigh = isGpt52Codex || isCodexMax;
 
-  let effort: ReasoningConfig['effort'] = 'medium';
-  if (isGpt52CodexHigh || supportsXhigh) {
+  let effort = useSettingsStore.getState().getReasoningEffort() as ReasoningConfig['effort'];
+  if (!supportsXhigh && effort === 'xhigh') {
     effort = 'high';
   }
-
   return {
-    effort,
+    effort: effort,
     summary: 'auto',
   };
 }

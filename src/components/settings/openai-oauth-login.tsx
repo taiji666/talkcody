@@ -74,6 +74,12 @@ export function OpenAIOAuthLogin() {
 
   // Perform the actual OAuth flow
   const performOAuth = useCallback(async () => {
+    // Prevent starting a new OAuth flow if one is already in progress
+    if (flowState === 'waiting-for-callback' || flowState === 'exchanging') {
+      logger.warn('[OpenAIOAuthLogin] OAuth flow already in progress, ignoring duplicate request');
+      return;
+    }
+
     setError(null);
     setAuthInput('');
     setAuthUrl('');
@@ -89,10 +95,19 @@ export function OpenAIOAuthLogin() {
       logger.info('[OpenAIOAuthLogin] Opened OAuth URL in browser with auto callback');
     } catch (err) {
       logger.error('[OpenAIOAuthLogin] Failed to start OAuth:', err);
-      setError(err instanceof Error ? err.message : t.Settings.openaiOAuth.connectionFailed);
-      setFlowState('idle');
+      const errorMessage = err instanceof Error ? err.message : '';
+
+      // Check if it's a port-related error
+      if (errorMessage.includes('port') || errorMessage.includes('Port')) {
+        setError(t.Settings.openaiOAuth.connectionFailedWithPort);
+      } else {
+        setError(t.Settings.openaiOAuth.connectionFailed);
+      }
+
+      // Automatically switch to manual entry mode
+      setFlowState('waiting-for-code');
     }
-  }, [startOAuthWithAutoCallback, t]);
+  }, [flowState, startOAuthWithAutoCallback, t]);
 
   // Handle starting OAuth flow with auto callback
   const handleStartOAuth = useCallback(async () => {
@@ -344,7 +359,7 @@ export function OpenAIOAuthLogin() {
             <p className="text-sm font-medium">{t.Settings.openaiOAuth.title}</p>
             <p className="text-xs text-muted-foreground">{t.Settings.openaiOAuth.description}</p>
           </div>
-          <Button onClick={handleStartOAuth} disabled={isLoading}>
+          <Button onClick={handleStartOAuth} disabled={isLoading || flowState !== 'idle'}>
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (

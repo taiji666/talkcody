@@ -157,6 +157,14 @@ export interface LocaleDefinition {
       disabledTooltip: string;
       toggleFailed: string;
     };
+    reasoningEffort: {
+      title: string;
+      description: string;
+      currentEffort: string;
+      hint: string;
+      success: string;
+      failed: string;
+    };
     toolbar: {
       model: string;
       planMode: string;
@@ -252,6 +260,8 @@ export interface LocaleDefinition {
       pasteCode: string;
       pasteCodeLabel: string;
       codePlaceholder: string;
+      portInUse: string;
+      portInUseTitle: string;
       connect: string;
       connected: string;
       connectedWithPlan: string;
@@ -259,6 +269,7 @@ export interface LocaleDefinition {
       disconnected: string;
       useApiKeyInstead: string;
       connectionFailed: string;
+      connectionFailedWithPort: string;
       tokenRefreshFailed: string;
       disclaimer: {
         dialogTitle: string;
@@ -278,6 +289,8 @@ export interface LocaleDefinition {
       step2: string;
       step2Hint: string;
       codePlaceholder: string;
+      portInUse: string;
+      portInUseTitle: string;
       connect: string;
       connected: string;
       connectedWithPlan: string;
@@ -285,6 +298,7 @@ export interface LocaleDefinition {
       disconnected: string;
       pasteCode: string;
       connectionFailed: string;
+      connectionFailedWithPort: string;
       tokenRefreshFailed: string;
       redirectUriNote: string;
       redirectUriHint: string;
@@ -930,6 +944,13 @@ export interface LocaleDefinition {
       generic: string;
       tryAgain: string;
     };
+  };
+
+  KeepAwake: {
+    enabled: string;
+    disabled: string;
+    error: string;
+    platformNotSupported: string;
   };
 
   MCPServers: {

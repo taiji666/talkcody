@@ -286,6 +286,7 @@ export class LLMService {
         };
 
         const totalStartTime = Date.now();
+        const reasoningEffort = useSettingsStore.getState().getReasoningEffort();
 
         logger.info('Starting agent loop with model', {
           model,
@@ -293,6 +294,7 @@ export class LLMService {
           taskId: this.taskId,
           inputMessageCount: inputMessages.length,
           agentId: agentId || 'default',
+          reasoningEffort,
         });
         const t = this.getTranslations();
         onStatus?.(t.LLMService.status.initializing);
@@ -441,16 +443,6 @@ export class LLMService {
           loopState.currentIteration++;
 
           const filteredTools = { ...tools };
-          // const isPlanModeEnabled = usePlanModeStore.getState().isPlanModeEnabled;
-
-          // const availableTools = Object.keys(filteredTools);
-
-          // logger.info(`Agent loop Step ${loopState.currentIteration}`, {
-          //   iteration: loopState.currentIteration,
-          //   messageCount: loopState.messages.length,
-          //   isPlanModeEnabled,
-          //   availableTools,
-          // });
           onStatus?.(t.LLMService.status.step(loopState.currentIteration));
 
           // Reset stream processor state for new iteration
@@ -557,6 +549,16 @@ export class LLMService {
               const enableReasoningOptions = isThink;
               const providerOptionsMap: Record<string, unknown> = {};
 
+              const normalizedReasoningEffort = (() => {
+                const { modelKey } = parseModelIdentifier(model);
+                const supportsXhigh =
+                  modelKey === 'gpt-5.2-codex' || modelKey === 'gpt-5.1-codex-max';
+                if (!supportsXhigh && reasoningEffort === 'xhigh') {
+                  return 'high';
+                }
+                return reasoningEffort;
+              })();
+
               if (enableReasoningOptions) {
                 providerOptionsMap.google = {
                   thinkingConfig: {
@@ -567,8 +569,12 @@ export class LLMService {
                 providerOptionsMap.anthropic = {
                   thinking: { type: 'enabled', budgetTokens: 12_000 },
                 };
+
                 providerOptionsMap.openai = {
-                  reasoningEffort: 'medium',
+                  reasoningEffort: normalizedReasoningEffort,
+                };
+                providerOptionsMap.openrouter = {
+                  effort: normalizedReasoningEffort,
                 };
               }
 

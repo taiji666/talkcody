@@ -18,8 +18,6 @@ export interface CommandContext {
   sendMessage?: (message: string) => Promise<void>;
   /** Function to create a new task */
   createNewTask?: () => Promise<void>;
-  /** Function to show a notification/toast */
-  showNotification?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 /**
