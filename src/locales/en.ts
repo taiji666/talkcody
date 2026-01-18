@@ -187,6 +187,15 @@ const en: LocaleDefinition = {
       disabledTooltip: 'Manual review: AI will ask for approval before applying edits',
       toggleFailed: 'Failed to update auto-approve setting',
     },
+    autoApprovePlan: {
+      title: 'Auto-approve plan',
+      description: 'When enabled, plans will be approved automatically without review',
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      enabledTooltip: 'Auto-approve: AI will proceed without waiting for plan approval',
+      disabledTooltip: 'Manual review: AI will wait for plan approval before acting',
+      toggleFailed: 'Failed to update auto-approve setting',
+    },
     reasoningEffort: {
       title: 'Reasoning Effort',
       description:
@@ -227,6 +236,7 @@ const en: LocaleDefinition = {
       general: 'General',
       language: 'Language',
       customTools: 'Custom Tools',
+      hooks: 'Hooks',
     },
     account: {
       title: 'Account Settings',
@@ -618,6 +628,38 @@ const en: LocaleDefinition = {
       homeDirectoryLabel: 'Home directory',
       empty: 'No custom tools found.',
     },
+    hooks: {
+      title: 'Hooks',
+      description: 'Run commands automatically at key moments in the agent workflow.',
+      tooltipTitle: 'Hooks',
+      tooltipDescription:
+        'Hooks execute local commands before or after tools run, when prompts are submitted, and when the session ends. Use with caution.',
+      enableLabel: 'Enable hooks',
+      enableDescription: 'When enabled, hook commands run automatically in the background.',
+      warningTitle: 'Hooks run local commands',
+      warningBody:
+        'Hooks execute with your current user permissions. Review every hook carefully to avoid unintended changes or data loss.',
+      configTitle: 'Hooks configuration',
+      configDescription: 'Edit the hooks JSON configuration for this scope.',
+      configEditorLabel: 'Hooks JSON',
+      scope: {
+        user: 'User scope',
+        project: 'Project scope',
+        local: 'Local project scope',
+      },
+      save: 'Save configuration',
+      saving: 'Saving...',
+      reload: 'Reload from disk',
+      loadFailed: 'Failed to load hooks configuration',
+      saveSuccess: 'Hooks configuration saved',
+      saveFailed: 'Failed to save hooks configuration',
+      invalidJson: 'Invalid JSON. Please check your hooks configuration.',
+      toggleFailed: 'Failed to update hooks setting',
+      enabledToast: 'Hooks enabled',
+      disabledToast: 'Hooks disabled',
+      blockedPrompt: 'Prompt blocked by hook.',
+    },
+    hooksScopeHint: 'Scopes are merged in the order: user -> project -> local project.',
   },
 
   Agents: {

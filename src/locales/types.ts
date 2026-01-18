@@ -178,6 +178,15 @@ export interface LocaleDefinition {
       disabledTooltip: string;
       toggleFailed: string;
     };
+    autoApprovePlan: {
+      title: string;
+      description: string;
+      enabled: string;
+      disabled: string;
+      enabledTooltip: string;
+      disabledTooltip: string;
+      toggleFailed: string;
+    };
     reasoningEffort: {
       title: string;
       description: string;
@@ -220,7 +229,9 @@ export interface LocaleDefinition {
       about: string;
       language: string;
       customTools: string;
+      hooks: string;
     };
+    hooksScopeHint: string;
     account: {
       title: string;
       description: string;
@@ -588,6 +599,36 @@ export interface LocaleDefinition {
       workspaceDirectoryLabel: string;
       homeDirectoryLabel: string;
     };
+    hooks: {
+      title: string;
+      description: string;
+      tooltipTitle: string;
+      tooltipDescription: string;
+      enableLabel: string;
+      enableDescription: string;
+      warningTitle: string;
+      warningBody: string;
+      configTitle: string;
+      configDescription: string;
+      configEditorLabel: string;
+      scope: {
+        user: string;
+        project: string;
+        local: string;
+      };
+      save: string;
+      saving: string;
+      reload: string;
+      loadFailed: string;
+      saveSuccess: string;
+      saveFailed: string;
+      invalidJson: string;
+      toggleFailed: string;
+      enabledToast: string;
+      disabledToast: string;
+      blockedPrompt: string;
+    };
+    hooksScopeHint: string;
   };
 
   Agents: {

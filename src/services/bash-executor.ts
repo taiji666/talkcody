@@ -606,6 +606,19 @@ export class BashExecutor {
    * @param toolUseId - Optional tool use ID for output file naming
    */
   async execute(command: string, taskId: string, toolId: string): Promise<BashResult> {
+    return this.executeWithTimeout(command, taskId, toolId, 300000, 60000);
+  }
+
+  /**
+   * Execute a bash command with custom timeouts
+   */
+  async executeWithTimeout(
+    command: string,
+    taskId: string,
+    _toolId: string,
+    timeoutMs: number,
+    idleTimeoutMs: number
+  ): Promise<BashResult> {
     try {
       // Safety check
       const dangerCheck = this.isDangerousCommand(command);
@@ -639,7 +652,7 @@ export class BashExecutor {
         this.logger.info('No rootPath set, executing in default directory');
       }
 
-      const result = await this.executeCommand(command, rootPath || null, 300000, 60000);
+      const result = await this.executeCommand(command, rootPath || null, timeoutMs, idleTimeoutMs);
 
       return this.formatResult(result, command);
     } catch (error) {

@@ -10,6 +10,7 @@ import {
   Terminal,
   User,
   Wrench,
+  Zap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AboutSettings } from '@/components/settings/about-settings';
@@ -17,6 +18,7 @@ import { AccountSettings } from '@/components/settings/account-settings';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import { CustomToolsSettings } from '@/components/settings/custom-tools-settings';
 import { GeneralSettings } from '@/components/settings/general-settings';
+import { HooksSettings } from '@/components/settings/hooks-settings';
 import { LintSettings } from '@/components/settings/lint-settings';
 import { LspSettings } from '@/components/settings/lsp-settings';
 import { ModelTypeSettings } from '@/components/settings/model-type-settings';
@@ -122,6 +124,10 @@ export function SettingsPage() {
               <Wrench className="size-4" />
               {t.Settings.tabs.customTools}
             </TabsTrigger>
+            <TabsTrigger value="hooks" className="w-full justify-start gap-2 rounded-md px-3 py-2">
+              <Zap className="size-4" />
+              {t.Settings.tabs.hooks}
+            </TabsTrigger>
 
             <Separator className="my-2" />
 
@@ -165,6 +171,10 @@ export function SettingsPage() {
 
             <TabsContent value="custom-tools" className="mt-0 flex-none space-y-6">
               <CustomToolsSettings />
+            </TabsContent>
+
+            <TabsContent value="hooks" className="mt-0 flex-none space-y-6">
+              <HooksSettings />
             </TabsContent>
 
             <TabsContent value="shortcuts" className="mt-0 flex-none space-y-6">

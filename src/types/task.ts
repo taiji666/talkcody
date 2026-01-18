@@ -31,6 +31,7 @@ export interface Task {
 
 export interface TaskSettings {
   autoApproveEdits?: boolean; // When true, skip review dialog for file edits in this task
+  autoApprovePlan?: boolean; // When true, auto-approve plan for this task
 }
 
 export interface CreateProjectData {

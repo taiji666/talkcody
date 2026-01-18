@@ -19,8 +19,9 @@ import { getLocale, type SupportedLocale } from '@/locales';
 import { getContextLength } from '@/providers/config/model-config';
 import { parseModelIdentifier } from '@/providers/core/provider-utils';
 import { modelTypeService } from '@/providers/models/model-type-service';
+import { hookService } from '@/services/hooks/hook-service';
+import { hookStateService } from '@/services/hooks/hook-state-service';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
-import { usePlanModeStore } from '@/stores/plan-mode-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
 import { ModelType } from '@/types/model-types';
@@ -433,7 +434,27 @@ export class LLMService {
         // Previously, using a shared instance caused tool call ID mismatches when nested agents reset the processor
         const streamProcessor = new StreamProcessor();
 
+        let didRunSessionStart = false;
+
         while (!loopState.isComplete && loopState.currentIteration < maxIterations) {
+          if (this.taskId && !isSubagent && !didRunSessionStart) {
+            const sessionStartSummary = await hookService.runSessionStart(this.taskId, 'startup');
+            hookService.applyHookSummary(sessionStartSummary);
+            didRunSessionStart = true;
+          }
+
+          if (this.taskId && !isSubagent) {
+            const extraContext = hookStateService.consumeAdditionalContext();
+            if (extraContext.length > 0) {
+              loopState.messages.push({
+                role: 'system',
+                content: extraContext.join('\n'),
+                providerOptions: {
+                  anthropic: { cacheControl: { type: 'ephemeral' } },
+                },
+              });
+            }
+          }
           // Check for abort signal
           if (abortController?.signal.aborted) {
             logger.info('Agent loop aborted by user');
@@ -592,7 +613,7 @@ export class LLMService {
                 }),
                 maxOutputTokens: 15000,
                 providerOptions,
-                onFinish: async ({ finishReason, usage, steps, totalUsage, response, request }) => {
+                onFinish: async ({ finishReason, usage, totalUsage }) => {
                   const requestDuration = Date.now() - requestStartTime;
 
                   if (totalUsage?.totalTokens) {
@@ -849,6 +870,15 @@ export class LLMService {
           // logger.info('Finish reason', { finishReason: loopState.lastFinishReason });
           // logger.info('Provider metadata', { providerMetadata });
 
+          if (this.taskId && toolCalls.length === 0) {
+            const stopSummary = await hookService.runStop(this.taskId);
+            hookService.applyHookSummary(stopSummary);
+            if (stopSummary.blocked) {
+              hookStateService.setStopHookActive(true);
+              continue;
+            }
+          }
+
           // Handle "unknown" finish reason by retrying without modifying messages
           if (loopState.lastFinishReason === 'unknown' && toolCalls.length === 0) {
             const maxUnknownRetries = 3;
@@ -971,6 +1001,9 @@ export class LLMService {
           }
         }
 
+        if (this.taskId && !isSubagent) {
+          await hookService.runSessionEnd(this.taskId, 'other');
+        }
         const totalDuration = Date.now() - totalStartTime;
         logger.info('Agent loop completed', {
           totalIterations: loopState.currentIteration,

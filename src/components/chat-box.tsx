@@ -16,6 +16,7 @@ import { commandExecutor } from '@/services/commands/command-executor';
 import { commandRegistry } from '@/services/commands/command-registry';
 import { databaseService } from '@/services/database-service';
 import { executionService } from '@/services/execution-service';
+import { hookService } from '@/services/hooks/hook-service';
 import { messageService } from '@/services/message-service';
 import { previewSystemPrompt } from '@/services/prompt/preview';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
@@ -429,6 +430,17 @@ export const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(
 
       const userMessage = input.trim();
       setInput('');
+
+      const activeTaskId = currentTaskId || taskId;
+      if (activeTaskId) {
+        const hookSummary = await hookService.runUserPromptSubmit(activeTaskId, userMessage);
+        hookService.applyHookSummary(hookSummary);
+        if (hookSummary.blocked || hookSummary.continue === false) {
+          const reason = hookSummary.blockReason || hookSummary.stopReason;
+          toast.error(reason || t.Settings.hooks.blockedPrompt);
+          return;
+        }
+      }
 
       if (userMessage.startsWith('/')) {
         try {

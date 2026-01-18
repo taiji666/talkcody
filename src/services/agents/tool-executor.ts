@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { getToolMetadata } from '@/lib/tools';
 import type { Tracer } from '@/lib/tracer';
 import { decodeObjectHtmlEntities } from '@/lib/utils';
+import { hookService } from '@/services/hooks/hook-service';
 import type { AgentLoopState, AgentToolSet, UIMessage } from '@/types/agent';
 import type { ToolExecuteContext, ToolInput, ToolWithUI } from '@/types/tool';
 import type { AgentExecutionGroup, AgentExecutionStage } from './agent-dependency-analyzer';
@@ -202,46 +203,6 @@ export class ToolExecutor {
   }
 
   /**
-   * Get total tools from unified execution plan
-   */
-  private getTotalTools(plan: UnifiedExecutionPlan): number {
-    if (isAgentExecutionPlan(plan)) {
-      return plan.summary.totalAgents;
-    }
-    return plan.summary.totalTools;
-  }
-
-  /**
-   * Get total stages from unified execution plan
-   */
-  private getTotalStages(plan: UnifiedExecutionPlan): number {
-    if (isAgentExecutionPlan(plan)) {
-      return plan.stages.length;
-    }
-    return plan.summary.totalStages;
-  }
-
-  /**
-   * Get total groups from unified execution plan
-   */
-  private getTotalGroups(plan: UnifiedExecutionPlan): number {
-    if (isAgentExecutionPlan(plan)) {
-      return plan.summary.totalGroups;
-    }
-    return plan.summary.totalGroups;
-  }
-
-  /**
-   * Get concurrent groups from unified execution plan
-   */
-  private getConcurrentGroups(plan: UnifiedExecutionPlan): number {
-    if (isAgentExecutionPlan(plan)) {
-      return plan.summary.concurrentGroups;
-    }
-    return plan.summary.concurrentGroups;
-  }
-
-  /**
    * Get stages from unified execution plan
    */
   private getStages(plan: UnifiedExecutionPlan): (ExecutionStage | AgentExecutionStage)[] {
@@ -374,6 +335,25 @@ export class ToolExecutor {
               ? { value: parsedInput }
               : {};
 
+        const preToolSummary = await hookService.runPreToolUse(
+          options.taskId,
+          toolCall.toolName,
+          toolArgs as ToolInput,
+          toolCall.toolCallId
+        );
+        hookService.applyHookSummary(preToolSummary);
+        if (preToolSummary.updatedInput) {
+          toolArgs = preToolSummary.updatedInput;
+        }
+        if (preToolSummary.permissionDecision === 'deny' || preToolSummary.blocked) {
+          const reason = preToolSummary.permissionDecisionReason || preToolSummary.blockReason;
+          return {
+            success: false,
+            error: reason || 'Tool execution blocked by hook.',
+            hookBlocked: true,
+          };
+        }
+
         const isCallAgentTool = toolCall.toolName === 'callAgent';
 
         // Pass special parameters to callAgent tools
@@ -438,6 +418,15 @@ export class ToolExecutor {
           taskId: options.taskId,
           toolId: toolCall.toolCallId,
         });
+
+        const postToolSummary = await hookService.runPostToolUse(
+          options.taskId,
+          toolCall.toolName,
+          toolArgs as ToolInput,
+          toolResult as ToolOutput,
+          toolCall.toolCallId
+        );
+        hookService.applyHookSummary(postToolSummary);
         // const toolDuration = Date.now() - toolStartTime;
 
         // logger.info('Tool execution completed', {

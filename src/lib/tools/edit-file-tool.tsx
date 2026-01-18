@@ -446,7 +446,12 @@ Best practice workflow:
         // Handle review inline using the store
         try {
           // Send notification if window is not focused
-          await notificationService.notifyReviewRequired();
+          await notificationService.notifyHooked(
+            taskId,
+            'Review Required',
+            'File edit needs your approval',
+            'review_required'
+          );
 
           // Create a Promise that will be resolved when user reviews the edit
           const reviewResult = await new Promise<FileEditReviewResult>((resolve) => {

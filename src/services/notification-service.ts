@@ -5,6 +5,8 @@ import {
   sendNotification,
 } from '@tauri-apps/plugin-notification';
 import { logger } from '@/lib/logger';
+import { hookService } from '@/services/hooks/hook-service';
+import { settingsManager } from '@/stores/settings-store';
 
 class NotificationService {
   private permissionGranted: boolean | null = null;
@@ -84,6 +86,13 @@ class NotificationService {
 
   async notifyReviewRequired(): Promise<void> {
     await this.sendIfNotFocused('Review Required', 'File edit needs your approval');
+  }
+
+  async notifyHooked(taskId: string, title: string, body: string, type: string): Promise<void> {
+    if (settingsManager.getHooksEnabled()) {
+      await hookService.runNotification(taskId, body, type);
+    }
+    await this.sendIfNotFocused(title, body);
   }
 }
 

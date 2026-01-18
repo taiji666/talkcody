@@ -40,10 +40,15 @@ class TaskService {
     const title = generateConversationTitle(userMessage);
     const projectId = options?.projectId || (await settingsManager.getProject());
 
-    const autoApproveGlobal = await settingsManager.getAutoApproveEditsGlobal();
-    const initialTaskSettings: TaskSettings | undefined = autoApproveGlobal
-      ? { autoApproveEdits: true }
-      : undefined;
+    const autoApproveEditsGlobal = await settingsManager.getAutoApproveEditsGlobal();
+    const autoApprovePlanGlobal = await settingsManager.getAutoApprovePlanGlobal();
+    const initialTaskSettings: TaskSettings | undefined =
+      autoApproveEditsGlobal || autoApprovePlanGlobal
+        ? {
+            ...(autoApproveEditsGlobal ? { autoApproveEdits: true } : {}),
+            ...(autoApprovePlanGlobal ? { autoApprovePlan: true } : {}),
+          }
+        : undefined;
     const task: Task = {
       id: taskId,
       title,

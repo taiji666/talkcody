@@ -2,6 +2,7 @@
 import { logger } from '@/lib/logger';
 import { useProviderStore } from '@/providers/stores/provider-store';
 import { commandRegistry } from '@/services/commands/command-registry';
+import { hookSnapshotService } from '@/services/hooks/hook-snapshot-service';
 import { terminalService } from '@/services/terminal-service';
 import { useAgentStore } from '@/stores/agent-store';
 import { useAuthStore } from '@/stores/auth-store';
@@ -125,6 +126,13 @@ class InitializationManager {
             .initialize()
             .then(() => {
               logger.info('[InitManager] ✓ Command registry initialized (background)');
+            }),
+
+          // Hooks config snapshot
+          hookSnapshotService
+            .initializeSession()
+            .then(() => {
+              logger.info('[InitManager] ✓ Hooks snapshot initialized (background)');
             }),
 
           // Terminal service

@@ -36,6 +36,8 @@ interface SettingsState {
   is_plan_mode_enabled: boolean;
   is_worktree_mode_enabled: boolean;
   auto_approve_edits_global: boolean;
+  auto_approve_plan_global: boolean;
+  hooks_enabled: boolean;
 
   // Project Settings
   project: string;
@@ -111,7 +113,11 @@ interface SettingsActions {
   setPlanModeEnabled: (enabled: boolean) => Promise<void>;
   setWorktreeModeEnabled: (enabled: boolean) => Promise<void>;
   setAutoApproveEditsGlobal: (enabled: boolean) => Promise<void>;
+  setAutoApprovePlanGlobal: (enabled: boolean) => Promise<void>;
+  setHooksEnabled: (enabled: boolean) => Promise<void>;
   getAutoApproveEditsGlobal: () => boolean;
+  getAutoApprovePlanGlobal: () => boolean;
+  getHooksEnabled: () => boolean;
 
   // Project Settings
   setProject: (project: string) => Promise<void>;
@@ -201,6 +207,7 @@ interface SettingsActions {
   getAICompletionEnabled: () => boolean;
   getPlanModeEnabled: () => boolean;
   getWorktreeModeEnabled: () => boolean;
+  getHooksEnabled: () => boolean;
 }
 
 type SettingsStore = SettingsState & SettingsActions;
@@ -218,6 +225,8 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized
   is_plan_mode_enabled: false,
   is_worktree_mode_enabled: false,
   auto_approve_edits_global: false,
+  auto_approve_plan_global: false,
+  hooks_enabled: false,
   project: DEFAULT_PROJECT,
   current_root_path: '',
   custom_tools_dir: '',
@@ -287,6 +296,8 @@ class SettingsDatabase {
       get_context_tool_model: GROK_CODE_FAST,
       is_plan_mode_enabled: 'false',
       auto_approve_edits_global: 'false',
+      auto_approve_plan_global: 'false',
+      hooks_enabled: 'false',
       model_type_main: '',
       model_type_small: '',
       model_type_image_generator: '',
@@ -414,6 +425,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         'get_context_tool_model',
         'is_plan_mode_enabled',
         'auto_approve_edits_global',
+        'auto_approve_plan_global',
+        'hooks_enabled',
         'reasoning_effort',
         'project',
         'current_root_path',
@@ -491,6 +504,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         is_plan_mode_enabled: rawSettings.is_plan_mode_enabled === 'true',
         is_worktree_mode_enabled: rawSettings.is_worktree_mode_enabled === 'true',
         auto_approve_edits_global: rawSettings.auto_approve_edits_global === 'true',
+        auto_approve_plan_global: rawSettings.auto_approve_plan_global === 'true',
+        hooks_enabled: rawSettings.hooks_enabled === 'true',
         project: rawSettings.project || DEFAULT_PROJECT,
         current_root_path: rawSettings.current_root_path || '',
         custom_tools_dir: rawSettings.custom_tools_dir || '',
@@ -619,6 +634,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setAutoApproveEditsGlobal: async (enabled: boolean) => {
     await settingsDb.set('auto_approve_edits_global', enabled.toString());
     set({ auto_approve_edits_global: enabled });
+  },
+
+  setAutoApprovePlanGlobal: async (enabled: boolean) => {
+    await settingsDb.set('auto_approve_plan_global', enabled.toString());
+    set({ auto_approve_plan_global: enabled });
+  },
+
+  setHooksEnabled: async (enabled: boolean) => {
+    await settingsDb.set('hooks_enabled', enabled.toString());
+    set({ hooks_enabled: enabled });
   },
 
   // Project Settings
@@ -1004,6 +1029,14 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   getAutoApproveEditsGlobal: () => {
     return get().auto_approve_edits_global;
   },
+
+  getAutoApprovePlanGlobal: () => {
+    return get().auto_approve_plan_global;
+  },
+
+  getHooksEnabled: () => {
+    return get().hooks_enabled;
+  },
 }));
 
 // Export singleton for non-React usage (backward compatibility)
@@ -1035,6 +1068,9 @@ export const settingsManager = {
     useSettingsStore.getState().setWorktreeModeEnabled(enabled),
   setAutoApproveEditsGlobal: (enabled: boolean) =>
     useSettingsStore.getState().setAutoApproveEditsGlobal(enabled),
+  setAutoApprovePlanGlobal: (enabled: boolean) =>
+    useSettingsStore.getState().setAutoApprovePlanGlobal(enabled),
+  setHooksEnabled: (enabled: boolean) => useSettingsStore.getState().setHooksEnabled(enabled),
   setCustomToolsDir: (path: string) => useSettingsStore.getState().setCustomToolsDir(path),
 
   getModel: () => useSettingsStore.getState().getModel(),
@@ -1047,6 +1083,8 @@ export const settingsManager = {
   getPlanModeEnabled: () => useSettingsStore.getState().getPlanModeEnabled(),
   getWorktreeModeEnabled: () => useSettingsStore.getState().getWorktreeModeEnabled(),
   getAutoApproveEditsGlobal: () => useSettingsStore.getState().getAutoApproveEditsGlobal(),
+  getAutoApprovePlanGlobal: () => useSettingsStore.getState().getAutoApprovePlanGlobal(),
+  getHooksEnabled: () => useSettingsStore.getState().getHooksEnabled(),
 
   // API Keys
   setApiKeys: (apiKeys: ApiKeySettings) => useSettingsStore.getState().setApiKeys(apiKeys),

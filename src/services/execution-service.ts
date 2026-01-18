@@ -157,7 +157,12 @@ class ExecutionService {
                 });
             }
 
-            await notificationService.notifyAgentComplete();
+            await notificationService.notifyHooked(
+              taskId,
+              'Task Complete',
+              'TalkCody agent has finished processing',
+              'agent_complete'
+            );
 
             // Call external callback
             callbacks?.onComplete?.({ success: true, fullText });
