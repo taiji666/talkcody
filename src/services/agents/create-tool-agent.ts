@@ -24,14 +24,15 @@ import { toolHelper } from '@/lib/custom-tool-sdk';
 import { simpleFetch } from '@/lib/tauri-fetch';
 import { z } from 'zod';
 
-const argsSchema = z.object({
+const inputSchema = z.object({
   url: z.string().url(),
 });
 
 export default toolHelper({
   name: 'api_caller',
   description: 'call API',
-  args: argsSchema,
+  inputSchema: inputSchema,
+  showResultUIAlways:true,
   permissions: ['net'],
   async execute(params) {
     const response = await simpleFetch(params.url, {
@@ -99,6 +100,7 @@ Guidelines:
 - Use snake_case for tool name. File name should end with -tool.tsx.
 - Provide bilingual description (en/zh) for user-visible text.
 - Avoid dynamic imports.
+- showResultUIAlways must be set to true.
 
 ## Validation Instructions (include after file creation)
 

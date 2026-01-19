@@ -114,7 +114,7 @@ Use this tool when you need to persist a new agent based on user requirements.`,
     if (!idBase) {
       return {
         success: false,
-        message: 'Invalid agent id. / 代理 ID 无效。',
+        message: 'Invalid agent id',
       };
     }
 
@@ -163,8 +163,8 @@ Use this tool when you need to persist a new agent based on user requirements.`,
         .join(' | ');
 
       const message = toolNotes
-        ? `Agent "${params.name}" created (id: "${newId}"). ${toolNotes} / 已创建代理 "${params.name}"（ID："${newId}"）。${toolNotes}`
-        : `Agent "${params.name}" created (id: "${newId}"). / 已创建代理 "${params.name}"（ID："${newId}"）。`;
+        ? `Agent "${params.name}" created (id: "${newId}"). ${toolNotes}`
+        : `Agent "${params.name}" created (id: "${newId}").`;
 
       return {
         success: true,
@@ -178,16 +178,12 @@ Use this tool when you need to persist a new agent based on user requirements.`,
       logger.error('[createAgent] Failed to create agent', error);
       return {
         success: false,
-        message: 'Failed to create agent. / 创建代理失败。',
+        message: 'Failed to create agent',
       };
     }
   },
   renderToolDoing: (params: CreateAgentParams) => (
-    <GenericToolDoing
-      operation="write"
-      target={params.name}
-      details="Creating local agent / 创建本地代理"
-    />
+    <GenericToolDoing operation="write" target={params.name} details="Creating local agent" />
   ),
   renderToolResult: (result) => (
     <GenericToolResult

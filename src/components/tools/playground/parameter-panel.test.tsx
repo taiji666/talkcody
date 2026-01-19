@@ -41,7 +41,7 @@ function renderPanel(tool: CustomToolDefinition) {
 
 describe('ParameterPanel optional/default badges', () => {
   it('shows optional badges and default badges (including falsy defaults) and prefills inputs', () => {
-    const argsSchema = z.object({
+    const inputSchema = z.object({
       // optional only
       a: z.string().optional(),
       // default only (implied optional)
@@ -55,7 +55,7 @@ describe('ParameterPanel optional/default badges', () => {
     const tool: CustomToolDefinition = {
       name: 'test_tool',
       description: 'desc',
-      args: argsSchema,
+      inputSchema: inputSchema,
       async execute() {
         return {};
       },

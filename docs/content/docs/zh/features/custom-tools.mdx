@@ -86,7 +86,7 @@ import { toolHelper } from '@/lib/custom-tool-sdk';
 import { z } from 'zod';
 
 // 1. 定义参数模式（使用 Zod）
-const argsSchema = z.object({
+const inputSchema = z.object({
   message: z.string().min(1, '消息不能为空'),
   count: z.number().default(1),
 });
@@ -114,7 +114,7 @@ function renderResult(result: { result: string }) {
 export default toolHelper({
   name: 'my_custom_tool',
   description: '这是一个自定义工具的描述',
-  args: argsSchema,
+  inputSchema: inputSchema,
   execute: executeTool,
   ui: {
     Doing: renderDoing,
@@ -176,7 +176,7 @@ export default toolHelper({
 ```tsx
 import { z } from 'zod';
 
-const argsSchema = z.object({
+const inputSchema = z.object({
   // 必填字符串
   name: z.string().min(1),
   
@@ -325,14 +325,14 @@ import React from 'react';
 import { toolHelper } from '@/lib/custom-tool-sdk';
 import { z } from 'zod';
 
-const argsSchema = z.object({
+const inputSchema = z.object({
   message: z.string().min(1, 'message is required'),
 });
 
 export default toolHelper({
   name: 'basic_tool',
   description: 'A basic tool example',
-  args: argsSchema,
+  inputSchema: inputSchema,
   async execute(params) {
     return {
       success: true,
@@ -358,7 +358,7 @@ import { toolHelper } from '@/lib/custom-tool-sdk';
 import { simpleFetch } from '@/lib/tauri-fetch';
 import { z } from 'zod';
 
-const argsSchema = z.object({
+const inputSchema = z.object({
   url: z.string().url(),
   method: z.enum(['GET', 'POST']).default('GET'),
   headers: z.record(z.string()).optional(),
@@ -368,7 +368,7 @@ const argsSchema = z.object({
 export default toolHelper({
   name: 'network_tool',
   description: 'Fetch data from a URL',
-  args: argsSchema,
+  args: inputSchema,
   permissions: ['net'],
   async execute(params) {
     const response = await simpleFetch(params.url, {
@@ -483,7 +483,7 @@ import { toolHelper } from '@/lib/custom-tool-sdk';
 import { simpleFetch } from '@/lib/tauri-fetch';
 import { z } from 'zod';
 
-const argsSchema = z.object({
+const inputSchema = z.object({
   city: z.string().min(1, '城市名称不能为空'),
   unit: z.enum(['celsius', 'fahrenheit']).default('celsius'),
 });
@@ -498,7 +498,7 @@ interface WeatherResult {
 export default toolHelper({
   name: 'weather_query',
   description: '查询指定城市的天气信息',
-  args: argsSchema,
+  inputSchema: inputSchema,
   permissions: ['net'],
   async execute(params): Promise<{ success: true; data: WeatherResult } | { success: false; error: string }> {
     try {
@@ -587,7 +587,7 @@ async execute(params) {
 使用 Zod 进行严格的参数验证：
 
 ```tsx
-const argsSchema = z.object({
+const inputSchema = z.object({
   // 添加描述帮助 AI 理解
   query: z.string().min(1).describe('搜索查询关键词'),
   limit: z.number().min(1).max(100).default(10).describe('结果数量限制'),

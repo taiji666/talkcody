@@ -39,14 +39,14 @@ const TOOL_TEMPLATES: ToolTemplate[] = [
 import { toolHelper } from '@/lib/custom-tool-sdk';
 import { z } from 'zod';
 
-const argsSchema = z.object({
+const inputSchema = z.object({
   message: z.string().min(1, 'message is required'),
 });
 
 export default toolHelper({
   name: 'basic_tool',
   description: 'A basic tool example',
-  args: argsSchema,
+  inputSchema: inputSchema,
   async execute(params) {
     return {
       success: true,
@@ -72,7 +72,7 @@ import { toolHelper } from '@/lib/custom-tool-sdk';
 import { simpleFetch } from '@/lib/tauri-fetch';
 import { z } from 'zod';
 
-const argsSchema = z.object({
+const inputSchema = z.object({
   url: z.string().url(),
   method: z.enum(['GET', 'POST']).default('GET'),
   headers: z.record(z.string()).optional(),
@@ -267,7 +267,7 @@ function HtmlRenderer({
 export default toolHelper({
   name: 'network_tool',
   description: 'Fetch data from a URL, supports any public web page',
-  args: argsSchema,
+  inputSchema: inputSchema,
   permissions: ['net'],
   async execute(params) {
     const fetchOptions: RequestInit = {
@@ -590,7 +590,7 @@ export class ToolPlaygroundService {
     this.status = 'executing';
 
     const tool = this.compileResult.tool;
-    const schema = tool.inputSchema ?? tool.args;
+    const schema = tool.inputSchema;
     const parsedParams = parseToolParams(schema, params);
 
     if (!parsedParams.success) {

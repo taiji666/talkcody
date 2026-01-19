@@ -34,7 +34,7 @@ export default function ParameterPanel({ tool, onExecute, isExecuting }: Paramet
   const { parameterPresets, createParameterPreset, deleteParameterPreset, loadPreset } =
     usePlaygroundStore();
 
-  const inputSchema = tool.inputSchema ?? tool.args;
+  const inputSchema = tool.inputSchema;
 
   type SchemaNode = {
     _def?: {

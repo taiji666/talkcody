@@ -1,6 +1,6 @@
 import { dirname, normalize } from '@tauri-apps/api/path';
 import { exists, readTextFile } from '@tauri-apps/plugin-fs';
-import React, { isValidElement } from 'react';
+import { isValidElement } from 'react';
 import { z } from 'zod';
 import { GenericToolResult } from '@/components/tools/generic-tool-result';
 import { createTool } from '@/lib/create-tool';
@@ -55,8 +55,7 @@ function buildError(
   error: unknown,
   toolName?: string
 ): ValidationResult {
-  const message =
-    `Custom tool validation failed at ${stage}. / ` + `自定义工具验证失败：${stage}。`;
+  const message = `Custom tool validation failed at ${stage}.`;
   const detail = error instanceof Error ? error.message : String(error);
   return {
     success: false,
@@ -69,7 +68,7 @@ function buildError(
 }
 
 function parseToolParams(
-  schema: CustomToolDefinition['args'] | CustomToolDefinition['inputSchema'],
+  schema: CustomToolDefinition['inputSchema'],
   params: Record<string, unknown>
 ): { success: true; data: Record<string, unknown> } | { success: false; error: string } {
   if (!schema || typeof schema !== 'object' || !('safeParse' in schema)) {
@@ -90,10 +89,10 @@ function parseToolParams(
 
 export const testCustomTool = createTool({
   name: 'test_custom_tool',
-  description:
-    'Validate a custom tool file (compile, execute, render). / 验证自定义工具文件（编译、执行、渲染）。',
+  description: 'Validate a custom tool file (compile, execute, render)',
   inputSchema,
   canConcurrent: false,
+  hidden: true,
   execute: async ({ file_path, params = {} }, context: ToolExecuteContext) => {
     const normalizedPath = await normalize(file_path);
 
@@ -117,7 +116,7 @@ export const testCustomTool = createTool({
       }
 
       const toolName = definition.name || fileName;
-      const parsedParams = parseToolParams(definition.args ?? definition.inputSchema, params);
+      const parsedParams = parseToolParams(definition.inputSchema, params);
       if (!parsedParams.success) {
         return buildError('execute', normalizedPath, parsedParams.error, toolName);
       }
@@ -167,7 +166,7 @@ export const testCustomTool = createTool({
         success: true,
         file_path: normalizedPath,
         tool_name: toolName,
-        message: 'Custom tool validated successfully. / 自定义工具验证成功。',
+        message: 'Custom tool validated successfully',
       };
     } catch (error) {
       logger.error('[test_custom_tool] Validation failed', error);
@@ -175,9 +174,7 @@ export const testCustomTool = createTool({
     }
   },
   renderToolDoing: ({ file_path }) => (
-    <div className="text-sm text-muted-foreground">
-      Validating custom tool... / 正在验证自定义工具... ({file_path})
-    </div>
+    <div className="text-sm text-muted-foreground">Validating custom tool... ({file_path})</div>
   ),
   renderToolResult: (result: ValidationResult) => (
     <GenericToolResult
