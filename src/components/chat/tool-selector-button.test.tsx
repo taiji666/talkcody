@@ -1,7 +1,15 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentDefinition } from '@/types/agent';
 import { ToolSelectorButton } from './tool-selector-button';
+
+class MockResizeObserver {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+
+globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
 // Mock dependencies
 const mockAgentStoreState = {
@@ -36,6 +44,26 @@ vi.mock('@/stores/tool-override-store', () => {
 
   return {
     useToolOverrideStore: mockStore,
+  };
+});
+
+// Mock custom tools store
+const customToolsState = {
+  lastUpdatedAt: 0 as number | undefined,
+};
+
+vi.mock('@/stores/custom-tools-store', () => {
+  const mockStore: any = vi.fn((selector) => {
+    if (typeof selector === 'function') {
+      return selector(customToolsState);
+    }
+    return customToolsState;
+  });
+
+  mockStore.getState = () => customToolsState;
+
+  return {
+    useCustomToolsStore: mockStore,
   };
 });
 
@@ -123,14 +151,24 @@ vi.mock('@/stores/settings-store', () => {
 });
 
 describe('ToolSelectorButton Component', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Clear mock calls
+    vi.clearAllMocks();
+
     // Reset agent store state
     mockAgentStoreState.agents = new Map();
     mockAgentStoreState.isLoading = false;
     mockAgentStoreState.isInitialized = false;
 
-    // Clear mock calls
-    vi.clearAllMocks();
+    customToolsState.lastUpdatedAt = 0;
+
+    const mockUseAppSettings = await import('@/hooks/use-settings');
+    vi.mocked(mockUseAppSettings.useAppSettings).mockReturnValue({
+      settings: { assistantId: 'test-agent' } as any,
+      loading: false,
+      error: null,
+      setAssistantId: vi.fn(),
+    } as any);
   });
 
   it('should be disabled when no agent is loaded', () => {
@@ -368,6 +406,54 @@ describe('ToolSelectorButton Component', () => {
     // Verify agent-2 has 1 tool
     await waitFor(() => {
       expect(screen.getByText('1')).toBeInTheDocument();
+    });
+  });
+
+  it('should refresh available tools when custom tools update', async () => {
+    const agent = {
+      id: 'test-agent',
+      name: 'Test Agent',
+      modelType: 'main_model' as any,
+      systemPrompt: 'test',
+      tools: {
+        bashTool: {} as any,
+      },
+    } as AgentDefinition;
+
+    mockAgentStoreState.agents = new Map([['test-agent', agent]]);
+
+    const toolRegistry = await import('@/services/agents/tool-registry');
+    const mockedGetAvailableToolsForUISync = vi.mocked(
+      toolRegistry.getAvailableToolsForUISync
+    );
+
+    mockedGetAvailableToolsForUISync.mockReturnValueOnce([
+      { id: 'bashTool', label: 'Bash', ref: {} },
+    ]);
+
+    const { rerender } = render(<ToolSelectorButton />);
+
+    await waitFor(() => {
+      const button = screen.getByRole('button');
+      expect(button).not.toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByRole('button'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Bash')).toBeInTheDocument();
+    });
+
+    mockedGetAvailableToolsForUISync.mockReturnValueOnce([
+      { id: 'bashTool', label: 'Bash', ref: {} },
+      { id: 'readFile', label: 'Read File', ref: {} },
+    ]);
+
+    customToolsState.lastUpdatedAt = 1;
+    rerender(<ToolSelectorButton />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Read File')).toBeInTheDocument();
     });
   });
 });

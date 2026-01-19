@@ -14,6 +14,7 @@ import { logger } from '@/lib/logger';
 import { isToolAllowedForAgent } from '@/services/agents/agent-tool-access';
 import { areToolsLoaded, getAvailableToolsForUISync } from '@/services/agents/tool-registry';
 import { useAgentStore } from '@/stores/agent-store';
+import { useCustomToolsStore } from '@/stores/custom-tools-store';
 import { useToolOverrideStore } from '@/stores/tool-override-store';
 
 export function ToolSelectorButton() {
@@ -21,6 +22,7 @@ export function ToolSelectorButton() {
   const [open, setOpen] = useState(false);
   const { settings } = useAppSettings();
   const [toolsLoaded, setToolsLoaded] = useState(false);
+  const customToolsUpdatedAt = useCustomToolsStore((state) => state.lastUpdatedAt);
 
   // Subscribe to agents Map (triggers re-render when any agent updates)
   const agents = useAgentStore((state) => state.agents);
@@ -48,6 +50,7 @@ export function ToolSelectorButton() {
   // Get all available built-in tools (excluding hidden tools)
   // Return empty array if tools aren't loaded yet to prevent crash
   const builtInTools = useMemo(() => {
+    void customToolsUpdatedAt; // Recompute when custom tools refresh.
     // Check both local state and actual cache state (cache can be reset during HMR)
     if (!toolsLoaded || !areToolsLoaded()) return [];
     try {
@@ -62,7 +65,7 @@ export function ToolSelectorButton() {
       logger.error('Failed to get built-in tools:', error);
       return [];
     }
-  }, [toolsLoaded, currentAgent?.id]);
+  }, [toolsLoaded, currentAgent?.id, customToolsUpdatedAt]);
 
   // Subscribe to tool overrides
   const toolOverrides = useToolOverrideStore((state) => state.overrides);
