@@ -11,6 +11,10 @@ use url::Url;
 
 static REQUEST_COUNTER: AtomicU32 = AtomicU32::new(0);
 
+const ACCEPT_HEADER_VALUE: &str = "text/event-stream, text/plain, application/json";
+const PROXY_ACCEPT_ENCODING: &str = "gzip, br, identity";
+const STREAM_ACCEPT_ENCODING: &str = "identity";
+
 /// Validate URL to prevent SSRF attacks
 /// Returns an error if the URL points to a private/internal IP address
 /// Exception: localhost access is allowed for local development and AI services
@@ -157,6 +161,10 @@ fn should_end_on_empty_chunk(chunk: &[u8]) -> bool {
     chunk.is_empty()
 }
 
+fn should_soft_end_on_decode_error(is_decode_error: bool, chunk_count: u32) -> bool {
+    is_decode_error && chunk_count > 0
+}
+
 async fn drain_response_stream<S>(stream: &mut S, max_duration: Duration)
 where
     S: futures_util::Stream<Item = Result<Bytes, reqwest::Error>> + Unpin,
@@ -211,8 +219,8 @@ pub async fn proxy_fetch(request: ProxyRequest) -> Result<ProxyResponse, String>
 
     // Add explicit encoding expectations
     req_builder = req_builder
-        .header("Accept-Encoding", "gzip, br, identity")
-        .header("Accept", "text/event-stream, text/plain, application/json");
+        .header("Accept-Encoding", PROXY_ACCEPT_ENCODING)
+        .header("Accept", ACCEPT_HEADER_VALUE);
 
     // Add body if present
     if let Some(body) = request.body {
@@ -319,11 +327,11 @@ pub async fn stream_fetch(
         return Err(e);
     }
 
-    // Configure client with proper decompression and connection settings
+    // Configure client with connection settings for streaming and avoid auto-decompression.
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
-        .gzip(true)
-        .brotli(true)
+        .gzip(false)
+        .brotli(false)
         .tcp_nodelay(true) // Reduce latency for streaming
         .pool_max_idle_per_host(5) // Enable connection pooling
         .build()
@@ -353,8 +361,8 @@ pub async fn stream_fetch(
 
     // Add explicit encoding expectations
     req_builder = req_builder
-        .header("Accept-Encoding", "gzip, br, identity")
-        .header("Accept", "text/event-stream, text/plain, application/json");
+        .header("Accept-Encoding", STREAM_ACCEPT_ENCODING)
+        .header("Accept", ACCEPT_HEADER_VALUE);
 
     // Add body if present
     if let Some(body) = request.body {
@@ -379,16 +387,34 @@ pub async fn stream_fetch(
         }
     }
 
-    // Log and validate content-type for streaming
+    // Log response headers for streaming diagnostics
     let content_type = response
         .headers()
         .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("none");
+    let content_encoding = response
+        .headers()
+        .get("content-encoding")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("none");
+    let transfer_encoding = response
+        .headers()
+        .get("transfer-encoding")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("none");
+    let content_length = response
+        .headers()
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("none");
 
     log::info!(
-        "Stream fetch response content-type: {} (request_id: {})",
+        "Stream fetch response headers: content-type={}, content-encoding={}, transfer-encoding={}, content-length={} (request_id: {})",
         content_type,
+        content_encoding,
+        transfer_encoding,
+        content_length,
         request_id
     );
 
@@ -447,6 +473,17 @@ pub async fn stream_fetch(
                     }
                 }
                 Ok(Some(Err(e))) => {
+                    if should_soft_end_on_decode_error(e.is_decode(), chunk_count) {
+                        log::warn!(
+                            "Decode error after {} chunks; treating as stream end (request_id: {}): {}",
+                            chunk_count,
+                            request_id,
+                            e
+                        );
+                        stream_exhausted = true;
+                        break;
+                    }
+
                     consecutive_errors += 1;
                     log::error!(
                         "Error reading chunk {} (request_id: {}): {} (consecutive: {})",
@@ -945,15 +982,27 @@ mod tests {
     #[test]
     fn test_encoding_headers() {
         // Test that the encoding headers are properly formatted
-        let accept_encoding = "gzip, br, identity";
-        assert!(accept_encoding.contains("gzip"));
-        assert!(accept_encoding.contains("br"));
-        assert!(accept_encoding.contains("identity"));
+        let proxy_accept_encoding = PROXY_ACCEPT_ENCODING;
+        assert!(proxy_accept_encoding.contains("gzip"));
+        assert!(proxy_accept_encoding.contains("br"));
+        assert!(proxy_accept_encoding.contains("identity"));
 
-        let accept = "text/event-stream, text/plain, application/json";
+        let stream_accept_encoding = STREAM_ACCEPT_ENCODING;
+        assert_eq!(stream_accept_encoding, "identity");
+        assert!(!stream_accept_encoding.contains("gzip"));
+        assert!(!stream_accept_encoding.contains("br"));
+
+        let accept = ACCEPT_HEADER_VALUE;
         assert!(accept.contains("text/event-stream"));
         assert!(accept.contains("text/plain"));
         assert!(accept.contains("application/json"));
+    }
+
+    #[test]
+    fn test_should_soft_end_on_decode_error() {
+        assert!(should_soft_end_on_decode_error(true, 1));
+        assert!(!should_soft_end_on_decode_error(true, 0));
+        assert!(!should_soft_end_on_decode_error(false, 5));
     }
 
     #[test]
