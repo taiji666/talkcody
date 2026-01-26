@@ -1,5 +1,5 @@
 import { tool } from 'ai';
-import type { ToolExecuteContext, ToolInput, ToolOutput, ToolWithUI } from '@/types/tool';
+import type { ToolInput, ToolOutput, ToolWithUI } from '@/types/tool';
 
 // Context passed to tool UI renderers
 export interface ToolUIContext {
@@ -16,8 +16,6 @@ const toolUIRegistry = new Map<
 >();
 
 export function registerToolUIRenderers(toolWithUI: ToolWithUI, keyName: string) {
-  if (toolUIRegistry.has(keyName)) return;
-
   toolUIRegistry.set(keyName, {
     renderToolDoing: toolWithUI.renderToolDoing,
     renderToolResult: toolWithUI.renderToolResult,

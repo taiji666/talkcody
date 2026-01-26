@@ -222,6 +222,11 @@ async function loadSingleFileTool(
     }
 
     applyToolUI(definition as CustomToolDefinition & CustomToolUIConfig);
+    logger.info('[CustomToolLoader] Loaded custom tool', {
+      definition: definition,
+      filePath,
+      source,
+    });
 
     results.push({
       name: definition.name,
