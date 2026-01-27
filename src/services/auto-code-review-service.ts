@@ -15,11 +15,13 @@ import type { TaskSettings } from '@/types/task';
 export const lastReviewedChangeTimestamp = new Map<string, number>();
 
 const BASE_REVIEW_PROMPT = [
-  'Review the current working tree changes for this task.',
-  'Use: git status --porcelain, git diff, git diff --staged.',
-  'Read any relevant files for context as needed.',
+  'Review ONLY the files listed below for this task.',
+  'Read the specified files to understand the changes.',
+  'Focus on code quality, bugs, security issues, and best practices.',
   'Output sections: REVIEW SUMMARY, CRITICAL ISSUES (Blockers), MAJOR ISSUES (Required Changes).',
-  'If none, say "None found."',
+  'If none, say "None found.".',
+  'IMPORTANT: Only review the files listed below. Do not mention, reference, or ask about any other files.',
+  'IMPORTANT: Return only the code review results. Do not ask any questions.',
 ].join('\n');
 
 function getTaskSettings(taskId: string): TaskSettings | null {

@@ -480,8 +480,8 @@
         "lmstudio": "openai/gpt-oss-20b"
       },
       "pricing": {
-        "input": "0.00000007",
-        "output": "0.0000003"
+        "input": "0",
+        "output": "0"
       }
     },
     "gemini-2.5-flash-image": {

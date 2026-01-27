@@ -259,6 +259,7 @@ export class RalphLoopService {
         await this.persistIterationArtifacts({
           taskId,
           iteration: iterations,
+          startTime,
           userMessage: baseUserMessage,
           summaryFile,
           feedbackFile,
@@ -288,6 +289,7 @@ export class RalphLoopService {
       await this.persistIterationArtifacts({
         taskId,
         iteration: iterations,
+        startTime,
         userMessage: baseUserMessage,
         summaryFile,
         feedbackFile,
@@ -311,6 +313,7 @@ export class RalphLoopService {
     await this.persistFinalState({
       taskId,
       iteration: iterations,
+      startTime,
       summaryFile,
       stateFile,
       stopReason,
@@ -611,6 +614,7 @@ export class RalphLoopService {
   private async persistIterationArtifacts(params: {
     taskId: string;
     iteration: number;
+    startTime: number;
     userMessage: string;
     summaryFile: string;
     feedbackFile: string;
@@ -626,6 +630,7 @@ export class RalphLoopService {
     const {
       taskId,
       iteration,
+      startTime,
       userMessage,
       summaryFile,
       feedbackFile,
@@ -640,11 +645,8 @@ export class RalphLoopService {
     const changes = useFileChangesStore.getState().getChanges(taskId);
     const filesChanged = Array.from(new Set(changes.map((change) => change.filePath)));
 
-    const summaryLines = [
-      '# Ralph Loop Summary',
-      '',
-      '## Objective',
-      userMessage,
+    // Build new iteration content
+    const newIterationContent = [
       '',
       `## Iteration ${iteration}`,
       `Stop candidate: ${evaluation.stopReason}`,
@@ -669,16 +671,30 @@ export class RalphLoopService {
       '',
       '## Last Output (truncated)',
       this.truncateText(iterationResult.fullText, 1200),
-      '',
-      summary ? '## Previous Summary\n' + summary : null,
       feedback ? '## Feedback\n' + feedback : null,
     ].filter(Boolean) as string[];
 
-    await taskFileService.writeFile('context', taskId, summaryFile, summaryLines.join('\n'));
+    // Append new iteration content to existing summary or create new summary
+    let summaryContent: string;
+    if (!summary || summary.trim().length === 0) {
+      // Create new summary with objective
+      summaryContent = [
+        '# Ralph Loop Summary',
+        '',
+        '## Objective',
+        userMessage,
+        ...newIterationContent,
+      ].join('\n');
+    } else {
+      // Append to existing summary
+      summaryContent = summary.trim() + newIterationContent.join('\n');
+    }
+
+    await taskFileService.writeFile('context', taskId, summaryFile, summaryContent);
 
     const state: RalphLoopStateFile = {
       taskId,
-      startedAt: Date.now(),
+      startedAt: startTime,
       updatedAt: Date.now(),
       iteration,
       stopReason: evaluation.stopReason,
@@ -693,18 +709,20 @@ export class RalphLoopService {
   private async persistFinalState(params: {
     taskId: string;
     iteration: number;
+    startTime: number;
     summaryFile: string;
     stateFile: string;
     stopReason: RalphLoopStopReason;
     stopMessage?: string;
   }): Promise<void> {
-    const { taskId, iteration, summaryFile, stateFile, stopReason, stopMessage } = params;
+    const { taskId, iteration, startTime, summaryFile, stateFile, stopReason, stopMessage } =
+      params;
 
     const summary = await taskFileService.readFile('context', taskId, summaryFile);
 
     const state: RalphLoopStateFile = {
       taskId,
-      startedAt: Date.now(),
+      startedAt: startTime,
       updatedAt: Date.now(),
       iteration,
       stopReason,

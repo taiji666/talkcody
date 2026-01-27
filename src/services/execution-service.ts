@@ -115,22 +115,41 @@ class ExecutionService {
         }
       };
 
-      const handleCompletion = async (fullText: string) => {
+      const handleCompletion = async (fullText: string, success: boolean = true) => {
         if (abortController.signal.aborted) return;
 
         await finalizeExecution();
 
-        await notificationService.notifyHooked(
-          taskId,
-          'Task Complete',
-          'TalkCody agent has finished processing',
-          'agent_complete'
-        );
+        if (success) {
+          await notificationService.notifyHooked(
+            taskId,
+            'Task Complete',
+            'TalkCody agent has finished processing',
+            'agent_complete'
+          );
+        }
 
-        callbacks?.onComplete?.({ success: true, fullText });
+        callbacks?.onComplete?.({ success, fullText });
       };
 
-      if (useSettingsStore.getState().getRalphLoopEnabled()) {
+      // Check per-task Ralph Loop setting first, fallback to global setting
+      const taskSettings = useTaskStore.getState().getTask(taskId)?.settings;
+      let ralphLoopEnabled = false;
+      if (taskSettings) {
+        try {
+          const parsedSettings = JSON.parse(taskSettings) as { ralphLoopEnabled?: boolean };
+          ralphLoopEnabled =
+            typeof parsedSettings.ralphLoopEnabled === 'boolean'
+              ? parsedSettings.ralphLoopEnabled
+              : useSettingsStore.getState().getRalphLoopEnabled();
+        } catch {
+          ralphLoopEnabled = useSettingsStore.getState().getRalphLoopEnabled();
+        }
+      } else {
+        ralphLoopEnabled = useSettingsStore.getState().getRalphLoopEnabled();
+      }
+
+      if (ralphLoopEnabled) {
         if (currentMessageId && streamedContent) {
           await messageService.finalizeMessage(taskId, currentMessageId, streamedContent);
           streamedContent = '';
@@ -159,7 +178,7 @@ class ExecutionService {
           },
         });
 
-        await handleCompletion(result.fullText);
+        await handleCompletion(result.fullText, result.success);
       } else {
         // 4. Run agent loop with callbacks that route through services
         await llmService.runAgentLoop(
