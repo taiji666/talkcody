@@ -60,6 +60,10 @@ vi.mock('@/pages/settings-page', () => ({
   SettingsPage: () => <div data-testid="settings-page">Settings Page</div>,
 }));
 
+vi.mock('@/pages/llm-tracing-page', () => ({
+  LLMTracingPage: () => <div data-testid="llm-tracing-page">LLM Tracing Page</div>,
+}));
+
 vi.mock('@/pages/logs-page', () => ({
   LogsPage: () => <div data-testid="logs-page">Logs Page</div>,
 }));
@@ -136,6 +140,7 @@ describe('MainContent - State Persistence on Page Switch', () => {
       { view: NavigationView.PROJECTS, testId: 'projects-page' },
       { view: NavigationView.SKILLS_MARKETPLACE, testId: 'skills-page' },
       { view: NavigationView.MCP_SERVERS, testId: 'mcp-servers-page' },
+      { view: NavigationView.LLM_TRACING, testId: 'llm-tracing-page' },
       { view: NavigationView.SETTINGS, testId: 'settings-page' },
     ];
 

@@ -62,6 +62,7 @@ pub enum TraceCommand {
     CloseSpan { span_id: String, ended_at: i64 },
     /// Add an event to a span
     AddEvent(SpanEvent),
+    #[cfg(test)]
     /// Flush all pending writes
     Flush,
     /// Shutdown the writer
@@ -73,44 +74,19 @@ pub mod attributes {
     // System and model attributes
     pub const GEN_AI_SYSTEM: &str = "gen_ai.system";
     pub const GEN_AI_REQUEST_MODEL: &str = "gen_ai.request.model";
-    pub const GEN_AI_RESPONSE_FINISH_REASONS: &str = "gen_ai.response.finish_reasons";
-
-    // Usage attributes
-    pub const GEN_AI_USAGE_INPUT_TOKENS: &str = "gen_ai.usage.input_tokens";
-    pub const GEN_AI_USAGE_OUTPUT_TOKENS: &str = "gen_ai.usage.output_tokens";
-    pub const GEN_AI_USAGE_TOTAL_TOKENS: &str = "gen_ai.usage.total_tokens";
-    pub const GEN_AI_USAGE_CACHED_INPUT_TOKENS: &str = "gen_ai.usage.cached_input_tokens";
-    pub const GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS: &str =
-        "gen_ai.usage.cache_creation_input_tokens";
 
     // Request parameters
     pub const GEN_AI_REQUEST_TEMPERATURE: &str = "gen_ai.request.temperature";
     pub const GEN_AI_REQUEST_TOP_P: &str = "gen_ai.request.top_p";
     pub const GEN_AI_REQUEST_TOP_K: &str = "gen_ai.request.top_k";
     pub const GEN_AI_REQUEST_MAX_TOKENS: &str = "gen_ai.request.max_tokens";
-    pub const GEN_AI_REQUEST_STOP_SEQUENCES: &str = "gen_ai.request.stop_sequences";
-    pub const GEN_AI_REQUEST_SEED: &str = "gen_ai.request.seed";
-    pub const GEN_AI_REQUEST_FREQUENCY_PENALTY: &str = "gen_ai.request.frequency_penalty";
-    pub const GEN_AI_REQUEST_PRESENCE_PENALTY: &str = "gen_ai.request.presence_penalty";
 
     // HTTP attributes
     pub const HTTP_REQUEST_BODY: &str = "http.request.body";
     pub const HTTP_RESPONSE_BODY: &str = "http.response.body";
-    pub const HTTP_REQUEST_METHOD: &str = "http.request.method";
-    pub const HTTP_REQUEST_URL: &str = "http.request.url";
-    pub const HTTP_RESPONSE_STATUS_CODE: &str = "http.response.status_code";
-    pub const HTTP_RESPONSE_CONTENT_TYPE: &str = "http.response.content_type";
 
     // Error attributes
     pub const ERROR_TYPE: &str = "error.type";
-    pub const ERROR_MESSAGE: &str = "error.message";
-    pub const ERROR_STACKTRACE: &str = "error.stacktrace";
-
-    // Span name constants
-    pub const SPAN_STREAM_COMPLETION: &str = "llm.stream_completion";
-    pub const SPAN_HTTP_REQUEST: &str = "llm.http_request";
-    pub const SPAN_STREAM_PROCESSING: &str = "llm.stream_processing";
-    pub const SPAN_TOOL_CALL: &str = "llm.tool_call";
 }
 
 /// Helper functions for building attributes
@@ -126,14 +102,6 @@ pub fn float_attr(value: f64) -> serde_json::Value {
     serde_json::Number::from_f64(value)
         .map(serde_json::Value::Number)
         .unwrap_or(serde_json::Value::Null)
-}
-
-pub fn bool_attr(value: bool) -> serde_json::Value {
-    serde_json::Value::Bool(value)
-}
-
-pub fn json_attr(value: impl Serialize) -> serde_json::Value {
-    serde_json::to_value(value).unwrap_or(serde_json::Value::Null)
 }
 
 /// Batch size and timing configuration
@@ -168,7 +136,7 @@ mod tests {
             string_attr("gpt-4"),
         );
         attributes.insert(
-            attributes::GEN_AI_USAGE_INPUT_TOKENS.to_string(),
+            attributes::GEN_AI_REQUEST_MAX_TOKENS.to_string(),
             int_attr(100),
         );
 
@@ -176,7 +144,7 @@ mod tests {
             id: "a1b2c3d4e5f67890".to_string(),
             trace_id: "20260130123456789-abc12345".to_string(),
             parent_span_id: None,
-            name: attributes::SPAN_STREAM_COMPLETION.to_string(),
+            name: "llm.stream_completion".to_string(),
             started_at: 1706611200000,
             ended_at: None,
             attributes,
@@ -213,6 +181,5 @@ mod tests {
             serde_json::Value::String("test".to_string())
         );
         assert_eq!(int_attr(42), serde_json::Value::Number(42.into()));
-        assert_eq!(bool_attr(true), serde_json::Value::Bool(true));
     }
 }

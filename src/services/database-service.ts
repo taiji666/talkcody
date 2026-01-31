@@ -8,6 +8,7 @@ import { ProjectService } from './database/project-service';
 import { type RecentFile, RecentFilesService } from './database/recent-files-service';
 import { type RecentProject, RecentProjectsService } from './database/recent-projects-service';
 import { TaskService } from './database/task-service';
+import { TraceService } from './database/trace-service';
 import { loadDatabase, type TursoClient } from './database/turso-client';
 import { TursoDatabaseInit } from './database/turso-database-init';
 
@@ -34,6 +35,7 @@ export class DatabaseService {
   private projectService: ProjectService | null = null;
   private taskService: TaskService | null = null;
   private apiUsageService: ApiUsageService | null = null;
+  private traceService: TraceService | null = null;
   private mcpServerService: MCPServerService | null = null;
   private recentFilesService: RecentFilesService | null = null;
   private recentProjectsService: RecentProjectsService | null = null;
@@ -53,6 +55,7 @@ export class DatabaseService {
       this.projectService = new ProjectService(this.db);
       this.taskService = new TaskService(this.db);
       this.apiUsageService = new ApiUsageService(this.db);
+      this.traceService = new TraceService(this.db);
       this.mcpServerService = new MCPServerService(this.db);
       this.recentFilesService = new RecentFilesService(this.db);
       this.recentProjectsService = new RecentProjectsService(this.db);
@@ -234,6 +237,18 @@ export class DatabaseService {
     await this.ensureInitialized();
     if (!this.taskService) throw new Error('Task service not initialized');
     return this.taskService.getMessages(taskId);
+  }
+
+  async getTraces(limit?: number, offset?: number) {
+    await this.ensureInitialized();
+    if (!this.traceService) throw new Error('Trace service not initialized');
+    return this.traceService.getTraces(limit, offset);
+  }
+
+  async getTraceDetails(traceId: string) {
+    await this.ensureInitialized();
+    if (!this.traceService) throw new Error('Trace service not initialized');
+    return this.traceService.getTraceDetails(traceId);
   }
 
   async getAttachmentsForMessage(messageId: string): Promise<MessageAttachment[]> {

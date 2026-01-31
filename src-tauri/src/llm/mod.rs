@@ -7,5 +7,3 @@ pub mod streaming;
 pub mod testing;
 pub mod tracing;
 pub mod types;
-
-pub use types::*;

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use crate::llm::testing::fixtures::{
     assert_json_matches, build_sse_body, ProviderFixture, RecordedResponse,
 };

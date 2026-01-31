@@ -3,9 +3,8 @@
 
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
-
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 use tokio::time::interval;
 
 use crate::database::Database;
@@ -22,6 +21,7 @@ pub struct TraceWriter {
     sender: mpsc::Sender<TraceCommand>,
     db: Arc<Database>,
     receiver: Arc<Mutex<Option<mpsc::Receiver<TraceCommand>>>>,
+    span_trace_ids: Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
 }
 
 impl TraceWriter {
@@ -34,6 +34,7 @@ impl TraceWriter {
             sender,
             db,
             receiver: Arc::new(Mutex::new(Some(receiver))),
+            span_trace_ids: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         }
     }
 
@@ -65,6 +66,7 @@ impl TraceWriter {
                 // Process incoming commands
                 Some(cmd) = receiver.recv() => {
                     match cmd {
+                        #[cfg(test)]
                         TraceCommand::Flush => {
                             if !batch.is_empty() {
                                 Self::flush_batch(&db, &mut batch).await;
@@ -216,14 +218,6 @@ impl TraceWriter {
         trace_id
     }
 
-    /// End a trace by updating its ended_at timestamp
-    /// Note: This updates the trace record. Traces are typically ended when the root span closes.
-    pub fn end_trace(&self, trace_id: String, ended_at: i64) {
-        // For now, we don't have a direct UPDATE for traces since we use the root span end
-        // This could be extended if needed
-        let _ = (trace_id, ended_at);
-    }
-
     /// Start a new span and return its ID
     pub fn start_span(
         &self,
@@ -237,13 +231,18 @@ impl TraceWriter {
 
         let span = Span {
             id: span_id.clone(),
-            trace_id,
+            trace_id: trace_id.clone(),
             parent_span_id,
             name,
             started_at: now,
             ended_at: None,
             attributes,
         };
+
+        self.span_trace_ids
+            .lock()
+            .expect("span trace map")
+            .insert(span_id.clone(), trace_id);
 
         match self.sender.try_send(TraceCommand::CreateSpan(span)) {
             Ok(_) => {}
@@ -258,8 +257,22 @@ impl TraceWriter {
         span_id
     }
 
+    #[cfg(test)]
+    pub fn trace_id_for_span(&self, span_id: &str) -> Option<String> {
+        self.span_trace_ids
+            .lock()
+            .expect("span trace map")
+            .get(span_id)
+            .cloned()
+    }
+
     /// End a span by updating its ended_at timestamp
     pub fn end_span(&self, span_id: String, ended_at: i64) {
+        self.span_trace_ids
+            .lock()
+            .expect("span trace map")
+            .remove(&span_id);
+
         match self
             .sender
             .try_send(TraceCommand::CloseSpan { span_id, ended_at })
@@ -303,27 +316,17 @@ impl TraceWriter {
         }
     }
 
+    #[cfg(test)]
     /// Request a flush of all pending writes
     /// This is best-effort and non-blocking
     pub fn request_flush(&self) {
-        match self.sender.try_send(TraceCommand::Flush) {
-            Ok(_) => {}
-            Err(e) => {
-                log::debug!("Failed to send flush command: {:?}", e);
-            }
-        }
-    }
-
-    /// Shutdown the writer gracefully
-    /// Waits for pending writes to complete
-    pub async fn shutdown(&self) {
-        match self.sender.send(TraceCommand::Shutdown).await {
-            Ok(_) => {
-                // Give the background task time to complete
-                tokio::time::sleep(Duration::from_millis(100)).await;
-            }
-            Err(e) => {
-                log::error!("Failed to send shutdown command: {:?}", e);
+        #[cfg(test)]
+        {
+            match self.sender.try_send(TraceCommand::Flush) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::debug!("Failed to send flush command: {:?}", e);
+                }
             }
         }
     }
@@ -376,6 +379,7 @@ impl Clone for TraceWriter {
             sender: self.sender.clone(),
             db: self.db.clone(),
             receiver: self.receiver.clone(),
+            span_trace_ids: self.span_trace_ids.clone(),
         }
     }
 }

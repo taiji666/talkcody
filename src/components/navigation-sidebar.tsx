@@ -7,6 +7,7 @@ import {
   FileText,
   FolderOpen,
   Github,
+  Radar,
   Server,
   Settings,
   Wrench,
@@ -97,6 +98,12 @@ export function NavigationSidebar({ activeView, onViewChange }: NavigationSideba
       action: handleXClick,
     },
     {
+      id: NavigationView.LLM_TRACING,
+      icon: Radar,
+      tooltip: t.Navigation.tracingTooltip,
+      action: () => onViewChange(NavigationView.LLM_TRACING),
+    },
+    {
       id: NavigationView.LOGS,
       icon: FileText,
       tooltip: t.Navigation.logsTooltip,
@@ -158,7 +165,9 @@ export function NavigationSidebar({ activeView, onViewChange }: NavigationSideba
       <div className="mt-auto flex flex-col items-center space-y-1 p-1">
         {bottomNavigationItems.map((item) => {
           const Icon = item.icon;
-          const isActive = item.id === NavigationView.LOGS && activeView === NavigationView.LOGS;
+          const isActive =
+            (item.id === NavigationView.LOGS && activeView === NavigationView.LOGS) ||
+            (item.id === NavigationView.LLM_TRACING && activeView === NavigationView.LLM_TRACING);
 
           return (
             <Tooltip key={item.id}>

@@ -73,55 +73,6 @@ impl ApiKeyManager {
         Ok(api_keys)
     }
 
-    pub async fn load_base_urls(&self) -> Result<HashMap<String, String>, String> {
-        let mut base_urls = HashMap::new();
-        let rows = self
-            .db
-            .query(
-                "SELECT key, value FROM settings WHERE key LIKE 'base_url_%'",
-                vec![],
-            )
-            .await?;
-        for row in rows.rows {
-            let key = row.get("key").and_then(|v| v.as_str()).unwrap_or_default();
-            let value = row
-                .get("value")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default();
-            if let Some(provider_id) = key.strip_prefix("base_url_") {
-                if !value.is_empty() {
-                    base_urls.insert(provider_id.to_string(), value.to_string());
-                }
-            }
-        }
-        Ok(base_urls)
-    }
-
-    pub async fn load_provider_flags(&self, prefix: &str) -> Result<HashMap<String, bool>, String> {
-        let mut flags = HashMap::new();
-        let rows = self
-            .db
-            .query(
-                &format!(
-                    "SELECT key, value FROM settings WHERE key LIKE '{}%'",
-                    prefix
-                ),
-                vec![],
-            )
-            .await?;
-        for row in rows.rows {
-            let key = row.get("key").and_then(|v| v.as_str()).unwrap_or_default();
-            let value = row
-                .get("value")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default();
-            if let Some(provider_id) = key.strip_prefix(prefix) {
-                flags.insert(provider_id.to_string(), value == "true");
-            }
-        }
-        Ok(flags)
-    }
-
     pub async fn load_custom_providers(&self) -> Result<CustomProvidersConfiguration, String> {
         let value = self.get_setting("custom_providers_json").await?;
         if let Some(raw) = value {
@@ -419,26 +370,5 @@ mod tests {
             .await
             .expect("no header");
         assert!(other_headers.get("chatgpt-account-id").is_none());
-    }
-
-    #[tokio::test]
-    async fn load_provider_flags_parses_boolean_settings() {
-        let ctx = setup().await;
-        ctx.api_keys
-            .set_setting("use_coding_plan_zhipu", "true")
-            .await
-            .expect("set flag");
-        ctx.api_keys
-            .set_setting("use_coding_plan_zai", "false")
-            .await
-            .expect("set flag");
-
-        let flags = ctx
-            .api_keys
-            .load_provider_flags("use_coding_plan_")
-            .await
-            .expect("load flags");
-        assert_eq!(flags.get("zhipu"), Some(&true));
-        assert_eq!(flags.get("zai"), Some(&false));
     }
 }

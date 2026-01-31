@@ -1039,6 +1039,8 @@ const en: LocaleDefinition = {
     toolsPlaygroundTooltip: 'Test and develop custom tools',
     usage: 'Usage',
     usageTooltip: 'View subscription and coding plan usage',
+    tracing: 'Tracing',
+    tracingTooltip: 'Inspect LLM traces and spans',
     logs: 'Logs',
     logsTooltip: 'View application logs',
     settings: 'Settings',
@@ -1077,6 +1079,24 @@ const en: LocaleDefinition = {
     latestEntriesDescription:
       'Most recent application logs. Logs are automatically written by the application.',
     noLogsFound: 'No logs found.',
+  },
+
+  Tracing: {
+    title: 'Tracing',
+    description: 'Inspect LLM traces, spans, and request/response metadata.',
+    listTitle: 'Traces',
+    detailTitle: 'Trace Details',
+    spansTitle: 'Spans',
+    eventsTitle: 'Events',
+    attributesLabel: 'Attributes',
+    startedAtLabel: 'Started',
+    durationLabel: 'Duration',
+    spanCountLabel: 'Span Count',
+    loadError: 'Failed to load trace data',
+    emptyDescription: 'No traces recorded yet. Run an agent to capture traces.',
+    selectTrace: 'Select a trace to view details.',
+    noSpans: 'No spans found for this trace.',
+    noEvents: 'No events recorded.',
   },
 
   Initialization: {

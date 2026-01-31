@@ -15,6 +15,8 @@ export const createMockDatabaseService = (
 ) => ({
   initialize: vi.fn().mockResolvedValue(overrides.initialize ?? undefined),
   insertApiUsageEvent: vi.fn().mockResolvedValue(undefined),
+  getTraces: vi.fn().mockResolvedValue([]),
+  getTraceDetails: vi.fn().mockResolvedValue(null),
   db: {
     select: vi.fn().mockResolvedValue(overrides.db?.select ?? []),
     execute: vi.fn().mockResolvedValue(overrides.db?.execute ?? { rowsAffected: 0 }),

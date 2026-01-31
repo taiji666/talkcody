@@ -11,6 +11,7 @@ export class TursoSchema {
     await TursoSchema.createChatTables(db);
     await TursoSchema.createAgentTables(db);
     await TursoSchema.createSkillTables(db);
+    await TursoSchema.createTracingTables(db);
     await TursoSchema.createSettingsTables(db);
     await TursoSchema.createSchemaVersionTable(db);
     await TursoSchema.createIndexes(db);
@@ -244,6 +245,42 @@ export class TursoSchema {
     `);
   }
 
+  private static async createTracingTables(db: Client): Promise<void> {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS traces (
+        id TEXT PRIMARY KEY,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER,
+        metadata TEXT
+      )
+    `);
+
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS spans (
+        id TEXT PRIMARY KEY,
+        trace_id TEXT NOT NULL,
+        parent_span_id TEXT,
+        name TEXT NOT NULL,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER,
+        attributes TEXT,
+        FOREIGN KEY (trace_id) REFERENCES traces(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_span_id) REFERENCES spans(id) ON DELETE SET NULL
+      )
+    `);
+
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS span_events (
+        id TEXT PRIMARY KEY,
+        span_id TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        payload TEXT,
+        FOREIGN KEY (span_id) REFERENCES spans(id) ON DELETE CASCADE
+      )
+    `);
+  }
+
   private static async createSettingsTables(db: Client): Promise<void> {
     await db.execute(`
       CREATE TABLE IF NOT EXISTS settings (
@@ -351,6 +388,19 @@ export class TursoSchema {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_recent_files_repository ON recent_files(repository_path, opened_at DESC)'
     );
+
+    // Tracing indexes
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id)');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_spans_parent_span_id ON spans(parent_span_id)'
+    );
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_span_events_span_id ON span_events(span_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_traces_started_at ON traces(started_at DESC)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_spans_started_at ON spans(started_at DESC)');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_span_events_timestamp ON span_events(timestamp DESC)'
+    );
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_span_events_type ON span_events(event_type)');
 
     // API usage events indexes
     await db.execute(

@@ -337,6 +337,35 @@ export class TestDatabaseAdapter {
         opened_at INTEGER NOT NULL
       )`,
 
+      // Tracing tables
+      `CREATE TABLE IF NOT EXISTS traces (
+        id TEXT PRIMARY KEY,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER,
+        metadata TEXT
+      )`,
+
+      `CREATE TABLE IF NOT EXISTS spans (
+        id TEXT PRIMARY KEY,
+        trace_id TEXT NOT NULL,
+        parent_span_id TEXT,
+        name TEXT NOT NULL,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER,
+        attributes TEXT,
+        FOREIGN KEY (trace_id) REFERENCES traces(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_span_id) REFERENCES spans(id) ON DELETE SET NULL
+      )`,
+
+      `CREATE TABLE IF NOT EXISTS span_events (
+        id TEXT PRIMARY KEY,
+        span_id TEXT NOT NULL,
+        timestamp INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        payload TEXT,
+        FOREIGN KEY (span_id) REFERENCES spans(id) ON DELETE CASCADE
+      )`,
+
       // Agents table
       `CREATE TABLE IF NOT EXISTS agents (
         id TEXT PRIMARY KEY,
@@ -442,6 +471,13 @@ export class TestDatabaseAdapter {
       'CREATE INDEX IF NOT EXISTS idx_conversation_skills_conversation ON conversation_skills(conversation_id)',
       'CREATE INDEX IF NOT EXISTS idx_recent_files_repository ON recent_files(repository_path, opened_at DESC)',
       'CREATE INDEX IF NOT EXISTS idx_recent_projects_opened_at ON recent_projects(opened_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id)',
+      'CREATE INDEX IF NOT EXISTS idx_spans_parent_span_id ON spans(parent_span_id)',
+      'CREATE INDEX IF NOT EXISTS idx_span_events_span_id ON span_events(span_id)',
+      'CREATE INDEX IF NOT EXISTS idx_traces_started_at ON traces(started_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_spans_started_at ON spans(started_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_span_events_timestamp ON span_events(timestamp DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_span_events_type ON span_events(event_type)',
       'CREATE INDEX IF NOT EXISTS idx_api_usage_events_created_at ON api_usage_events(created_at)',
       'CREATE INDEX IF NOT EXISTS idx_api_usage_events_model ON api_usage_events(model)',
       'CREATE INDEX IF NOT EXISTS idx_api_usage_events_conversation ON api_usage_events(conversation_id)',

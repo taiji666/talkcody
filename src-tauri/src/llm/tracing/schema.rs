@@ -1,86 +1,69 @@
 // Database schema for LLM tracing
 // Creates tables for traces, spans, and span events
 
+#[cfg(test)]
 use std::sync::Arc;
 
+#[cfg(test)]
 use crate::database::Database;
-
-/// SQL statements to create the tracing schema
-const CREATE_TRACES_TABLE: &str = r#"
-CREATE TABLE IF NOT EXISTS traces (
-    id TEXT PRIMARY KEY,
-    started_at INTEGER NOT NULL,
-    ended_at INTEGER,
-    metadata TEXT
-)
-"#;
-
-const CREATE_SPANS_TABLE: &str = r#"
-CREATE TABLE IF NOT EXISTS spans (
-    id TEXT PRIMARY KEY,
-    trace_id TEXT NOT NULL,
-    parent_span_id TEXT,
-    name TEXT NOT NULL,
-    started_at INTEGER NOT NULL,
-    ended_at INTEGER,
-    attributes TEXT,
-    FOREIGN KEY (trace_id) REFERENCES traces(id) ON DELETE CASCADE,
-    FOREIGN KEY (parent_span_id) REFERENCES spans(id) ON DELETE SET NULL
-)
-"#;
-
-const CREATE_SPAN_EVENTS_TABLE: &str = r#"
-CREATE TABLE IF NOT EXISTS span_events (
-    id TEXT PRIMARY KEY,
-    span_id TEXT NOT NULL,
-    timestamp INTEGER NOT NULL,
-    event_type TEXT NOT NULL,
-    payload TEXT,
-    FOREIGN KEY (span_id) REFERENCES spans(id) ON DELETE CASCADE
-)
-"#;
-
-/// Index definitions for efficient querying
-const CREATE_INDEX_TRACE_ID_ON_SPANS: &str =
-    "CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id)";
-
-const CREATE_INDEX_PARENT_SPAN_ID_ON_SPANS: &str =
-    "CREATE INDEX IF NOT EXISTS idx_spans_parent_span_id ON spans(parent_span_id)";
-
-const CREATE_INDEX_SPAN_ID_ON_EVENTS: &str =
-    "CREATE INDEX IF NOT EXISTS idx_span_events_span_id ON span_events(span_id)";
-
-const CREATE_INDEX_STARTED_AT_ON_TRACES: &str =
-    "CREATE INDEX IF NOT EXISTS idx_traces_started_at ON traces(started_at DESC)";
-
-const CREATE_INDEX_STARTED_AT_ON_SPANS: &str =
-    "CREATE INDEX IF NOT EXISTS idx_spans_started_at ON spans(started_at DESC)";
-
-const CREATE_INDEX_TIMESTAMP_ON_EVENTS: &str =
-    "CREATE INDEX IF NOT EXISTS idx_span_events_timestamp ON span_events(timestamp DESC)";
-
-const CREATE_INDEX_EVENT_TYPE_ON_EVENTS: &str =
-    "CREATE INDEX IF NOT EXISTS idx_span_events_type ON span_events(event_type)";
 
 /// Initializes the tracing database schema
 /// Creates tables and indexes if they don't exist
+#[cfg(test)]
 pub async fn init_tracing_schema(db: &Arc<Database>) -> Result<(), String> {
     // Create tables
-    db.execute(CREATE_TRACES_TABLE, vec![]).await?;
-    db.execute(CREATE_SPANS_TABLE, vec![]).await?;
-    db.execute(CREATE_SPAN_EVENTS_TABLE, vec![]).await?;
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS traces (id TEXT PRIMARY KEY, started_at INTEGER NOT NULL, ended_at INTEGER, metadata TEXT)",
+        vec![],
+    )
+    .await?;
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS spans (id TEXT PRIMARY KEY, trace_id TEXT NOT NULL, parent_span_id TEXT, name TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER, attributes TEXT, FOREIGN KEY (trace_id) REFERENCES traces(id) ON DELETE CASCADE, FOREIGN KEY (parent_span_id) REFERENCES spans(id) ON DELETE SET NULL)",
+        vec![],
+    )
+    .await?;
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS span_events (id TEXT PRIMARY KEY, span_id TEXT NOT NULL, timestamp INTEGER NOT NULL, event_type TEXT NOT NULL, payload TEXT, FOREIGN KEY (span_id) REFERENCES spans(id) ON DELETE CASCADE)",
+        vec![],
+    )
+    .await?;
 
     // Create indexes for efficient querying
-    db.execute(CREATE_INDEX_TRACE_ID_ON_SPANS, vec![]).await?;
-    db.execute(CREATE_INDEX_PARENT_SPAN_ID_ON_SPANS, vec![])
-        .await?;
-    db.execute(CREATE_INDEX_SPAN_ID_ON_EVENTS, vec![]).await?;
-    db.execute(CREATE_INDEX_STARTED_AT_ON_TRACES, vec![])
-        .await?;
-    db.execute(CREATE_INDEX_STARTED_AT_ON_SPANS, vec![]).await?;
-    db.execute(CREATE_INDEX_TIMESTAMP_ON_EVENTS, vec![]).await?;
-    db.execute(CREATE_INDEX_EVENT_TYPE_ON_EVENTS, vec![])
-        .await?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spans_trace_id ON spans(trace_id)",
+        vec![],
+    )
+    .await?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spans_parent_span_id ON spans(parent_span_id)",
+        vec![],
+    )
+    .await?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_span_events_span_id ON span_events(span_id)",
+        vec![],
+    )
+    .await?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_traces_started_at ON traces(started_at DESC)",
+        vec![],
+    )
+    .await?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_spans_started_at ON spans(started_at DESC)",
+        vec![],
+    )
+    .await?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_span_events_timestamp ON span_events(timestamp DESC)",
+        vec![],
+    )
+    .await?;
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_span_events_type ON span_events(event_type)",
+        vec![],
+    )
+    .await?;
 
     log::info!("LLM tracing schema initialized successfully");
     Ok(())
@@ -101,23 +84,6 @@ pub mod queries {
     /// Insert a new span event
     pub const INSERT_SPAN_EVENT: &str =
         "INSERT INTO span_events (id, span_id, timestamp, event_type, payload) VALUES (?, ?, ?, ?, ?)";
-
-    /// Query traces with optional filters
-    pub const QUERY_TRACES: &str = "SELECT * FROM traces ORDER BY started_at DESC LIMIT ? OFFSET ?";
-
-    /// Query spans for a trace
-    pub const QUERY_SPANS_BY_TRACE: &str =
-        "SELECT * FROM spans WHERE trace_id = ? ORDER BY started_at";
-
-    /// Query events for a span
-    pub const QUERY_EVENTS_BY_SPAN: &str =
-        "SELECT * FROM span_events WHERE span_id = ? ORDER BY timestamp";
-
-    /// Get trace by ID with all spans and events
-    pub const GET_TRACE_BY_ID: &str = "SELECT * FROM traces WHERE id = ?";
-
-    /// Delete old traces (for cleanup)
-    pub const DELETE_TRACES_BEFORE: &str = "DELETE FROM traces WHERE started_at < ?";
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
 const ANY_VALUE_SENTINEL: &str = "__ANY__";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +74,7 @@ pub fn fixture_path(dir: &Path, fixture: &ProviderFixture) -> PathBuf {
     dir.join(fixture_file_name(fixture))
 }
 
+#[cfg(test)]
 pub fn load_fixture(path: &Path) -> Result<ProviderFixture, String> {
     let raw = std::fs::read_to_string(path)
         .map_err(|e| format!("Failed to read fixture {}: {}", path.display(), e))?;
@@ -95,6 +97,7 @@ pub fn write_fixture(path: &Path, fixture: &ProviderFixture) -> Result<(), Strin
         .map_err(|e| format!("Failed to write fixture {}: {}", path.display(), e))
 }
 
+#[cfg(test)]
 pub fn build_sse_body(events: &[RecordedSseEvent]) -> String {
     let mut body = String::new();
     for event in events {
@@ -113,6 +116,7 @@ pub fn build_sse_body(events: &[RecordedSseEvent]) -> String {
     body
 }
 
+#[cfg(test)]
 pub fn parse_sse_body(body: &str) -> Vec<RecordedSseEvent> {
     let mut events = Vec::new();
     for raw in body.split("\n\n") {
@@ -140,6 +144,7 @@ pub fn parse_sse_body(body: &str) -> Vec<RecordedSseEvent> {
     events
 }
 
+#[cfg(test)]
 pub fn assert_json_matches(expected: &Value, actual: &Value) -> Result<(), String> {
     match expected {
         Value::String(value) if value == ANY_VALUE_SENTINEL => Ok(()),
@@ -213,6 +218,7 @@ pub fn assert_json_matches(expected: &Value, actual: &Value) -> Result<(), Strin
     }
 }
 
+#[cfg(test)]
 fn describe_json(value: &Value) -> String {
     match value {
         Value::Null => "null".to_string(),

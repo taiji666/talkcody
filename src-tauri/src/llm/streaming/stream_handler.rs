@@ -2,8 +2,8 @@ use crate::llm::auth::api_key_manager::ApiKeyManager;
 use crate::llm::protocols::{ProtocolStreamState, ToolCallAccum};
 use crate::llm::providers::provider_registry::ProviderRegistry;
 use crate::llm::testing::{Recorder, RecordingContext, TestConfig, TestMode};
-use crate::llm::tracing::helpers;
-use crate::llm::tracing::{generate_span_id, TraceWriter, TracingSpan};
+use crate::llm::tracing::types::{float_attr, int_attr};
+use crate::llm::tracing::TraceWriter;
 use crate::llm::types::{StreamEvent, StreamTextRequest};
 use futures_util::StreamExt;
 use serde_json;
@@ -91,16 +91,23 @@ impl<'a> StreamHandler<'a> {
         );
 
         // Initialize tracing span if trace_context is provided
-        let mut tracing_span: Option<TracingSpan> = None;
+        let mut trace_span_id: Option<String> = None;
         let mut trace_usage: Option<(i32, i32, Option<i32>, Option<i32>, Option<i32>)> = None;
         let mut trace_finish_reason: Option<String> = None;
 
         if let Some(ref trace_context) = request.trace_context {
             let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
-            let span_id = generate_span_id();
-            let mut attributes = HashMap::new();
+            let trace_id = trace_context
+                .trace_id
+                .clone()
+                .unwrap_or_else(|| trace_writer.start_trace());
 
-            // Add model and provider attributes
+            let span_name = trace_context
+                .span_name
+                .as_deref()
+                .unwrap_or("llm.stream_completion");
+
+            let mut attributes = HashMap::new();
             attributes.insert(
                 crate::llm::tracing::types::attributes::GEN_AI_REQUEST_MODEL.to_string(),
                 crate::llm::tracing::types::string_attr(&provider_model_name),
@@ -110,40 +117,40 @@ impl<'a> StreamHandler<'a> {
                 crate::llm::tracing::types::string_attr(&provider_id),
             );
 
-            // Add request parameters
-            helpers::add_request_params(
-                &mut attributes,
-                request.temperature,
-                request.top_p,
-                request.top_k,
-                request.max_tokens,
-            );
+            if let Some(t) = request.temperature {
+                attributes.insert(
+                    crate::llm::tracing::types::attributes::GEN_AI_REQUEST_TEMPERATURE.to_string(),
+                    float_attr(t as f64),
+                );
+            }
+            if let Some(p) = request.top_p {
+                attributes.insert(
+                    crate::llm::tracing::types::attributes::GEN_AI_REQUEST_TOP_P.to_string(),
+                    float_attr(p as f64),
+                );
+            }
+            if let Some(k) = request.top_k {
+                attributes.insert(
+                    crate::llm::tracing::types::attributes::GEN_AI_REQUEST_TOP_K.to_string(),
+                    int_attr(k as i64),
+                );
+            }
+            if let Some(m) = request.max_tokens {
+                attributes.insert(
+                    crate::llm::tracing::types::attributes::GEN_AI_REQUEST_MAX_TOKENS.to_string(),
+                    int_attr(m as i64),
+                );
+            }
 
-            let span_name = trace_context
-                .span_name
-                .as_deref()
-                .unwrap_or("llm.stream_completion");
-
-            let trace_id = trace_context
-                .trace_id
-                .clone()
-                .unwrap_or_else(|| span_id.clone());
-
-            let span = TracingSpan::new(
-                &trace_writer,
+            let span_id = trace_writer.start_span(
                 trace_id,
                 trace_context.parent_span_id.clone(),
                 span_name.to_string(),
                 attributes,
             );
+            trace_span_id = Some(span_id);
 
-            tracing_span = Some(span);
-
-            log::info!(
-                "[LLM Stream {}] Tracing span created: {}",
-                request_id,
-                span_id
-            );
+            log::info!("[LLM Stream {}] Tracing span created", request_id);
         }
 
         let credentials = self.api_keys.get_credentials(provider).await?;
@@ -227,9 +234,11 @@ impl<'a> StreamHandler<'a> {
         }
 
         // Record request event for tracing
-        if let Some(ref span) = tracing_span {
-            span.add_event(
-                crate::llm::tracing::types::attributes::HTTP_REQUEST_BODY,
+        if let Some(ref span_id) = trace_span_id {
+            let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
+            trace_writer.add_event(
+                span_id.clone(),
+                crate::llm::tracing::types::attributes::HTTP_REQUEST_BODY.to_string(),
                 Some(body.clone()),
             );
         }
@@ -305,15 +314,11 @@ impl<'a> StreamHandler<'a> {
                 let _ = recorder.finish_error(status, &response_headers, &text);
             }
             // Record error in tracing span
-            if let Some(ref span) = tracing_span {
-                let mut error_attrs = HashMap::new();
-                helpers::add_error(
-                    &mut error_attrs,
-                    "http_error",
-                    &format!("HTTP {}: {}", status, text),
-                );
-                span.add_event(
-                    crate::llm::tracing::types::attributes::ERROR_TYPE,
+            if let Some(ref span_id) = trace_span_id {
+                let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
+                trace_writer.add_event(
+                    span_id.clone(),
+                    crate::llm::tracing::types::attributes::ERROR_TYPE.to_string(),
                     Some(serde_json::json!({
                         "error_type": "http_error",
                         "status_code": status,
@@ -359,9 +364,11 @@ impl<'a> StreamHandler<'a> {
                         stream_timeout.as_secs()
                     );
                     // Record error in tracing span
-                    if let Some(ref span) = tracing_span {
-                        span.add_event(
-                            crate::llm::tracing::types::attributes::ERROR_TYPE,
+                    if let Some(ref span_id) = trace_span_id {
+                        let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
+                        trace_writer.add_event(
+                            span_id.clone(),
+                            crate::llm::tracing::types::attributes::ERROR_TYPE.to_string(),
                             Some(serde_json::json!({
                                 "error_type": "stream_timeout",
                                 "timeout_seconds": stream_timeout.as_secs(),
@@ -401,9 +408,11 @@ impl<'a> StreamHandler<'a> {
                         e
                     );
                     // Record error in tracing span
-                    if let Some(ref span) = tracing_span {
-                        span.add_event(
-                            crate::llm::tracing::types::attributes::ERROR_TYPE,
+                    if let Some(ref span_id) = trace_span_id {
+                        let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
+                        trace_writer.add_event(
+                            span_id.clone(),
+                            crate::llm::tracing::types::attributes::ERROR_TYPE.to_string(),
                             Some(serde_json::json!({
                                 "error_type": "stream_error",
                                 "chunk_count": chunk_count,
@@ -440,9 +449,11 @@ impl<'a> StreamHandler<'a> {
                             e
                         );
                         // Record error in tracing span
-                        if let Some(ref span) = tracing_span {
-                            span.add_event(
-                                crate::llm::tracing::types::attributes::ERROR_TYPE,
+                        if let Some(ref span_id) = trace_span_id {
+                            let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
+                            trace_writer.add_event(
+                                span_id.clone(),
+                                crate::llm::tracing::types::attributes::ERROR_TYPE.to_string(),
                                 Some(serde_json::json!({
                                     "error_type": "utf8_error",
                                     "message": format!("Invalid UTF-8 in SSE event: {}", e),
@@ -562,9 +573,11 @@ impl<'a> StreamHandler<'a> {
                                 err
                             );
                             // Record error in tracing span
-                            if let Some(ref span) = tracing_span {
-                                span.add_event(
-                                    crate::llm::tracing::types::attributes::ERROR_TYPE,
+                            if let Some(ref span_id) = trace_span_id {
+                                let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
+                                trace_writer.add_event(
+                                    span_id.clone(),
+                                    crate::llm::tracing::types::attributes::ERROR_TYPE.to_string(),
                                     Some(serde_json::json!({
                                         "error_type": "parse_error",
                                         "message": err,
@@ -609,7 +622,8 @@ impl<'a> StreamHandler<'a> {
         }
 
         // Record response event and usage for tracing
-        if let Some(ref span) = tracing_span {
+        if let Some(ref span_id) = trace_span_id {
+            let trace_writer = window.app_handle().state::<Arc<TraceWriter>>();
             // Add usage attributes if available
             if let Some((
                 input_tokens,
@@ -619,39 +633,53 @@ impl<'a> StreamHandler<'a> {
                 cache_creation_input_tokens,
             )) = trace_usage
             {
-                let mut usage_attrs = HashMap::new();
-                helpers::add_usage(
-                    &mut usage_attrs,
-                    input_tokens,
-                    output_tokens,
-                    total_tokens,
-                    cached_input_tokens,
-                    cache_creation_input_tokens,
+                let mut usage_attrs = serde_json::Map::new();
+                usage_attrs.insert(
+                    "input_tokens".to_string(),
+                    serde_json::Value::Number(input_tokens.into()),
                 );
-                // Record usage as an event
-                span.add_event(
-                    "gen_ai.usage",
-                    Some(serde_json::json!({
-                        "input_tokens": input_tokens,
-                        "output_tokens": output_tokens,
-                        "total_tokens": total_tokens,
-                        "cached_input_tokens": cached_input_tokens,
-                        "cache_creation_input_tokens": cache_creation_input_tokens,
-                    })),
+                usage_attrs.insert(
+                    "output_tokens".to_string(),
+                    serde_json::Value::Number(output_tokens.into()),
+                );
+                usage_attrs.insert(
+                    "total_tokens".to_string(),
+                    total_tokens
+                        .map(|value| serde_json::Value::Number(value.into()))
+                        .unwrap_or(serde_json::Value::Null),
+                );
+                usage_attrs.insert(
+                    "cached_input_tokens".to_string(),
+                    cached_input_tokens
+                        .map(|value| serde_json::Value::Number(value.into()))
+                        .unwrap_or(serde_json::Value::Null),
+                );
+                usage_attrs.insert(
+                    "cache_creation_input_tokens".to_string(),
+                    cache_creation_input_tokens
+                        .map(|value| serde_json::Value::Number(value.into()))
+                        .unwrap_or(serde_json::Value::Null),
+                );
+                trace_writer.add_event(
+                    span_id.clone(),
+                    "gen_ai.usage".to_string(),
+                    Some(serde_json::Value::Object(usage_attrs)),
                 );
             }
 
             // Add finish reason if available
             if let Some(ref finish_reason) = trace_finish_reason {
-                span.add_event(
-                    "gen_ai.finish_reason",
+                trace_writer.add_event(
+                    span_id.clone(),
+                    "gen_ai.finish_reason".to_string(),
                     Some(serde_json::json!({"finish_reason": finish_reason})),
                 );
             }
 
             // Record response event
-            span.add_event(
-                crate::llm::tracing::types::attributes::HTTP_RESPONSE_BODY,
+            trace_writer.add_event(
+                span_id.clone(),
+                crate::llm::tracing::types::attributes::HTTP_RESPONSE_BODY.to_string(),
                 Some(serde_json::json!({
                     "finish_reason": trace_finish_reason,
                     "usage": trace_usage.map(|(i, o, t, c, cc)| serde_json::json!({
@@ -664,7 +692,7 @@ impl<'a> StreamHandler<'a> {
                 })),
             );
 
-            // Span will be automatically closed when dropped
+            trace_writer.end_span(span_id.clone(), chrono::Utc::now().timestamp_millis());
         }
 
         let _ = window.emit(

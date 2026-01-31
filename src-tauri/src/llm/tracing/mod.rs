@@ -7,173 +7,114 @@ pub mod schema;
 pub mod types;
 pub mod writer;
 
-pub use ids::{generate_event_id, generate_span_id, generate_trace_id};
-pub use schema::init_tracing_schema;
-pub use types::{
-    attributes, bool_attr, float_attr, int_attr, json_attr, string_attr, Span, SpanEvent, Trace,
-    TraceCommand, BATCH_SIZE, BATCH_TIMEOUT_MS, CHANNEL_CAPACITY,
-};
-// Re-export TraceContext from llm/types for consistency
-pub use crate::llm::types::TraceContext;
 pub use writer::TraceWriter;
 
-use std::collections::HashMap;
+#[cfg(test)]
+mod tests {
+    use super::schema;
+    use super::TraceWriter;
+    use crate::llm::tracing::types::{attributes, float_attr, int_attr, string_attr};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+    use tempfile::TempDir;
 
-/// Helper struct for managing span lifecycle
-/// Automatically closes the span when dropped
-pub struct TracingSpan {
-    span_id: String,
-    trace_id: String,
-    writer: TraceWriter,
-    closed: bool,
-}
+    async fn create_test_setup() -> (TraceWriter, Arc<crate::database::Database>, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test_mod.db");
+        let db = Arc::new(crate::database::Database::new(
+            db_path.to_string_lossy().to_string(),
+        ));
+        db.connect()
+            .await
+            .expect("Failed to connect to test database");
 
-impl TracingSpan {
-    /// Create a new tracing span and start it
-    pub fn new(
-        writer: &TraceWriter,
-        trace_id: String,
-        parent_span_id: Option<String>,
-        name: String,
-        attributes: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        let span_id = writer.start_span(trace_id.clone(), parent_span_id, name, attributes);
+        // Initialize schema
+        schema::init_tracing_schema(&db).await.unwrap();
 
-        Self {
-            span_id,
-            trace_id,
-            writer: writer.clone(),
-            closed: false,
+        let writer = TraceWriter::new(db.clone());
+        writer.start();
+        (writer, db, temp_dir)
+    }
+
+    struct TestTracingSpan {
+        span_id: String,
+        writer: TraceWriter,
+        closed: bool,
+    }
+
+    impl TestTracingSpan {
+        fn new(
+            writer: &TraceWriter,
+            trace_id: String,
+            parent_span_id: Option<String>,
+            name: String,
+            attributes: HashMap<String, serde_json::Value>,
+        ) -> Self {
+            let span_id = writer.start_span(trace_id, parent_span_id, name, attributes);
+            Self {
+                span_id,
+                writer: writer.clone(),
+                closed: false,
+            }
+        }
+
+        fn span_id(&self) -> &str {
+            &self.span_id
+        }
+
+        fn add_event(&self, event_type: impl Into<String>, payload: Option<serde_json::Value>) {
+            self.writer
+                .add_event(self.span_id.clone(), event_type.into(), payload);
+        }
+
+        fn close(&mut self) {
+            if !self.closed {
+                let ended_at = chrono::Utc::now().timestamp_millis();
+                self.writer.end_span(self.span_id.clone(), ended_at);
+                self.closed = true;
+            }
         }
     }
 
-    /// Get the span ID
-    pub fn span_id(&self) -> &str {
-        &self.span_id
-    }
-
-    /// Get the trace ID
-    pub fn trace_id(&self) -> &str {
-        &self.trace_id
-    }
-
-    /// Add an event to this span
-    pub fn add_event(&self, event_type: impl Into<String>, payload: Option<serde_json::Value>) {
-        self.writer
-            .add_event(self.span_id.clone(), event_type.into(), payload);
-    }
-
-    /// Create a child span
-    pub fn create_child(
-        &self,
-        writer: &TraceWriter,
-        name: String,
-        attributes: HashMap<String, serde_json::Value>,
-    ) -> TracingSpan {
-        TracingSpan::new(
-            writer,
-            self.trace_id.clone(),
-            Some(self.span_id.clone()),
-            name,
-            attributes,
-        )
-    }
-
-    /// Manually close the span
-    pub fn close(&mut self) {
-        if !self.closed {
-            let ended_at = chrono::Utc::now().timestamp_millis();
-            self.writer.end_span(self.span_id.clone(), ended_at);
-            self.closed = true;
-        }
-    }
-}
-
-impl Drop for TracingSpan {
-    fn drop(&mut self) {
-        self.close();
-    }
-}
-
-/// Builder for creating traces with proper context
-pub struct TraceBuilder {
-    writer: TraceWriter,
-    trace_id: String,
-    root_span_name: String,
-    root_span_attributes: HashMap<String, serde_json::Value>,
-}
-
-impl TraceBuilder {
-    /// Create a new trace builder
-    pub fn new(writer: &TraceWriter, root_span_name: impl Into<String>) -> Self {
-        let trace_id = writer.start_trace();
-
-        Self {
-            writer: writer.clone(),
-            trace_id,
-            root_span_name: root_span_name.into(),
-            root_span_attributes: HashMap::new(),
+    impl Drop for TestTracingSpan {
+        fn drop(&mut self) {
+            self.close();
         }
     }
 
-    /// Create a new trace builder with a specific trace ID
-    pub fn with_trace_id(
-        writer: &TraceWriter,
-        trace_id: String,
-        root_span_name: impl Into<String>,
-    ) -> Self {
-        Self {
-            writer: writer.clone(),
-            trace_id,
-            root_span_name: root_span_name.into(),
-            root_span_attributes: HashMap::new(),
+    struct TestTraceBuilder {
+        writer: TraceWriter,
+        root_span_name: String,
+        root_span_attributes: HashMap<String, serde_json::Value>,
+    }
+
+    impl TestTraceBuilder {
+        fn new(writer: &TraceWriter, root_span_name: impl Into<String>) -> Self {
+            Self {
+                writer: writer.clone(),
+                root_span_name: root_span_name.into(),
+                root_span_attributes: HashMap::new(),
+            }
+        }
+
+        fn with_attribute(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+            self.root_span_attributes.insert(key.into(), value);
+            self
+        }
+
+        fn build(self) -> TestTracingSpan {
+            let trace_id = self.writer.start_trace();
+            TestTracingSpan::new(
+                &self.writer,
+                trace_id,
+                None,
+                self.root_span_name,
+                self.root_span_attributes,
+            )
         }
     }
 
-    /// Add an attribute to the root span
-    pub fn with_attribute(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
-        self.root_span_attributes.insert(key.into(), value);
-        self
-    }
-
-    /// Build and start the trace, returning the root span
-    pub fn build(self) -> TracingSpan {
-        TracingSpan::new(
-            &self.writer,
-            self.trace_id,
-            None,
-            self.root_span_name,
-            self.root_span_attributes,
-        )
-    }
-
-    /// Get the trace ID
-    pub fn trace_id(&self) -> &str {
-        &self.trace_id
-    }
-}
-
-/// Helper functions for common tracing operations
-pub mod helpers {
-    use super::*;
-
-    /// Create a trace for stream completion
-    pub fn start_stream_completion_trace(
-        writer: &TraceWriter,
-        model: impl Into<String>,
-        provider: impl Into<String>,
-    ) -> TraceBuilder {
-        let mut builder = TraceBuilder::new(writer, attributes::SPAN_STREAM_COMPLETION);
-
-        builder = builder
-            .with_attribute(attributes::GEN_AI_REQUEST_MODEL, string_attr(model))
-            .with_attribute(attributes::GEN_AI_SYSTEM, string_attr(provider));
-
-        builder
-    }
-
-    /// Add request parameters to span attributes
-    pub fn add_request_params(
+    fn add_request_params(
         attributes: &mut HashMap<String, serde_json::Value>,
         temperature: Option<f32>,
         top_p: Option<f32>,
@@ -206,105 +147,23 @@ pub mod helpers {
         }
     }
 
-    /// Add usage information to span attributes
-    pub fn add_usage(
-        attributes: &mut HashMap<String, serde_json::Value>,
-        input_tokens: i32,
-        output_tokens: i32,
-        total_tokens: Option<i32>,
-        cached_input_tokens: Option<i32>,
-        cache_creation_input_tokens: Option<i32>,
-    ) {
-        attributes.insert(
-            attributes::GEN_AI_USAGE_INPUT_TOKENS.to_string(),
-            int_attr(input_tokens as i64),
-        );
-        attributes.insert(
-            attributes::GEN_AI_USAGE_OUTPUT_TOKENS.to_string(),
-            int_attr(output_tokens as i64),
-        );
-
-        if let Some(t) = total_tokens {
-            attributes.insert(
-                attributes::GEN_AI_USAGE_TOTAL_TOKENS.to_string(),
-                int_attr(t as i64),
-            );
-        }
-        if let Some(c) = cached_input_tokens {
-            attributes.insert(
-                attributes::GEN_AI_USAGE_CACHED_INPUT_TOKENS.to_string(),
-                int_attr(c as i64),
-            );
-        }
-        if let Some(c) = cache_creation_input_tokens {
-            attributes.insert(
-                attributes::GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS.to_string(),
-                int_attr(c as i64),
-            );
-        }
-    }
-
-    /// Add finish reason to span attributes
-    pub fn add_finish_reason(
-        attributes: &mut HashMap<String, serde_json::Value>,
-        finish_reason: impl Into<String>,
-    ) {
-        attributes.insert(
-            attributes::GEN_AI_RESPONSE_FINISH_REASONS.to_string(),
-            string_attr(finish_reason),
-        );
-    }
-
-    /// Add error information to span attributes
-    pub fn add_error(
+    fn add_error(
         attributes: &mut HashMap<String, serde_json::Value>,
         error_type: impl Into<String>,
         error_message: impl Into<String>,
     ) {
         attributes.insert(attributes::ERROR_TYPE.to_string(), string_attr(error_type));
-        attributes.insert(
-            attributes::ERROR_MESSAGE.to_string(),
-            string_attr(error_message),
-        );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::HashMap;
-    use std::sync::Arc;
-    use tempfile::TempDir;
-
-    async fn create_test_setup() -> (TraceWriter, Arc<crate::database::Database>, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("test_mod.db");
-        let db = Arc::new(crate::database::Database::new(
-            db_path.to_string_lossy().to_string(),
-        ));
-        db.connect()
-            .await
-            .expect("Failed to connect to test database");
-
-        // Initialize schema
-        schema::init_tracing_schema(&db).await.unwrap();
-
-        let writer = TraceWriter::new(db.clone());
-        writer.start();
-        (writer, db, temp_dir)
+        attributes.insert("error.message".to_string(), string_attr(error_message));
     }
 
     #[tokio::test]
     async fn test_tracing_span_lifecycle() {
         let (writer, db, _temp_dir) = create_test_setup().await;
 
-        // First create a trace (spans need a valid trace due to FK constraint)
-        let trace_id = writer.start_trace();
-
         // Create a span
-        let span = TracingSpan::new(
+        let span = TestTracingSpan::new(
             &writer,
-            trace_id.clone(),
+            writer.start_trace(),
             None,
             "test.span".to_string(),
             HashMap::new(),
@@ -339,12 +198,9 @@ mod tests {
     async fn test_tracing_span_manual_close() {
         let (writer, db, _temp_dir) = create_test_setup().await;
 
-        // First create a trace
-        let trace_id = writer.start_trace();
-
-        let mut span = TracingSpan::new(
+        let mut span = TestTracingSpan::new(
             &writer,
-            trace_id.clone(),
+            writer.start_trace(),
             None,
             "test.span".to_string(),
             HashMap::new(),
@@ -384,12 +240,9 @@ mod tests {
     async fn test_child_span() {
         let (writer, db, _temp_dir) = create_test_setup().await;
 
-        // First create a trace
-        let trace_id = writer.start_trace();
-
-        let parent = TracingSpan::new(
+        let parent = TestTracingSpan::new(
             &writer,
-            trace_id.clone(),
+            writer.start_trace(),
             None,
             "parent.span".to_string(),
             HashMap::new(),
@@ -398,7 +251,15 @@ mod tests {
         let parent_id = parent.span_id().to_string();
 
         // Create child
-        let child = parent.create_child(&writer, "child.span".to_string(), HashMap::new());
+        let child = TestTracingSpan::new(
+            &writer,
+            writer
+                .trace_id_for_span(parent.span_id())
+                .unwrap_or_default(),
+            Some(parent.span_id().to_string()),
+            "child.span".to_string(),
+            HashMap::new(),
+        );
 
         let child_id = child.span_id().to_string();
 
@@ -430,7 +291,7 @@ mod tests {
     async fn test_trace_builder() {
         let (writer, db, _temp_dir) = create_test_setup().await;
 
-        let root = TraceBuilder::new(&writer, "root.span")
+        let root = TestTraceBuilder::new(&writer, "root.span")
             .with_attribute("custom.key", string_attr("custom.value"))
             .build();
 
@@ -461,41 +322,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_helpers() {
-        let (writer, _db, _temp_dir) = create_test_setup().await;
-
-        // Test start_stream_completion_trace
-        let builder = helpers::start_stream_completion_trace(&writer, "gpt-4", "openai");
-        assert_eq!(builder.root_span_name, "llm.stream_completion");
+        let (_writer, _db, _temp_dir) = create_test_setup().await;
 
         // Test add_request_params
         let mut attrs = HashMap::new();
-        helpers::add_request_params(&mut attrs, Some(0.7), Some(0.9), Some(50), Some(2000));
+        add_request_params(&mut attrs, Some(0.7), Some(0.9), Some(50), Some(2000));
         assert!(attrs.contains_key("gen_ai.request.temperature"));
         assert!(attrs.contains_key("gen_ai.request.max_tokens"));
 
-        // Test add_usage
-        let mut attrs = HashMap::new();
-        helpers::add_usage(&mut attrs, 100, 50, Some(150), Some(25), Some(10));
-        assert_eq!(
-            attrs.get("gen_ai.usage.input_tokens"),
-            Some(&serde_json::Value::Number(100.into()))
-        );
-        assert_eq!(
-            attrs.get("gen_ai.usage.output_tokens"),
-            Some(&serde_json::Value::Number(50.into()))
-        );
-
-        // Test add_finish_reason
-        let mut attrs = HashMap::new();
-        helpers::add_finish_reason(&mut attrs, "stop");
-        assert_eq!(
-            attrs.get("gen_ai.response.finish_reasons"),
-            Some(&serde_json::Value::String("stop".to_string()))
-        );
-
         // Test add_error
         let mut attrs = HashMap::new();
-        helpers::add_error(&mut attrs, "timeout", "Request timed out");
+        add_error(&mut attrs, "timeout", "Request timed out");
         assert_eq!(
             attrs.get("error.type"),
             Some(&serde_json::Value::String("timeout".to_string()))

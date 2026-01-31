@@ -628,6 +628,20 @@ fn cleanup_old_logs(log_dir: &std::path::Path, days_to_keep: u64) {
     }
 }
 
+fn init_trace_writer_state<R, M>(manager: &M, database: Arc<Database>) -> Arc<TraceWriter>
+where
+    R: tauri::Runtime,
+    M: Manager<R>,
+{
+    let trace_writer = Arc::new(TraceWriter::new(database));
+    let trace_writer_clone = trace_writer.clone();
+    tauri::async_runtime::spawn(async move {
+        trace_writer_clone.start();
+    });
+    manager.manage(trace_writer.clone());
+    trace_writer
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState {
@@ -664,12 +678,7 @@ pub fn run() {
             app.manage(database.clone());
 
             // Initialize LLM tracing
-            let trace_writer = TraceWriter::new(database.clone());
-            let trace_writer_clone = trace_writer.clone();
-            tauri::async_runtime::spawn(async move {
-                trace_writer_clone.start();
-            });
-            app.manage(trace_writer.clone());
+            init_trace_writer_state(app, database.clone());
 
             let llm_state = llm::auth::api_key_manager::LlmState::new(
                 database.clone(),
@@ -882,7 +891,7 @@ pub fn run() {
                 }
 
                 // Shutdown trace writer
-                if let Some(trace_writer) = app_handle.try_state::<TraceWriter>() {
+                if let Some(trace_writer) = app_handle.try_state::<Arc<TraceWriter>>() {
                     trace_writer.inner().shutdown_blocking();
                 }
 
@@ -895,4 +904,37 @@ pub fn run() {
                 log::info!("session_end sent, app will exit now");
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::init_trace_writer_state;
+    use crate::database::Database;
+    use crate::llm::tracing::writer::TraceWriter;
+    use std::sync::Arc;
+    use tauri::Manager;
+    use tempfile::TempDir;
+
+    /// This test uses Tauri test infrastructure that may not work on Windows CI
+    #[test]
+    #[cfg(not(target_os = "windows"))]
+    fn trace_writer_state_is_arc_in_app_state() {
+        let app = tauri::test::mock_app();
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("trace_writer_state.db");
+        let db = Arc::new(Database::new(db_path.to_string_lossy().to_string()));
+
+        let trace_writer = init_trace_writer_state(&app, db);
+
+        let window = tauri::WebviewWindowBuilder::new(
+            &app,
+            "trace-writer-state-test",
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .build()
+        .unwrap();
+
+        let state = window.app_handle().state::<Arc<TraceWriter>>();
+        assert!(Arc::ptr_eq(state.inner(), &trace_writer));
+    }
 }

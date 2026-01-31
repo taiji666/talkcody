@@ -1003,6 +1003,8 @@ const zh: LocaleDefinition = {
     toolsPlaygroundTooltip: '测试和开发自定义工具',
     usage: '使用情况',
     usageTooltip: '查看订阅和 Coding Plan 使用情况',
+    tracing: 'Tracing',
+    tracingTooltip: '查看 LLM Trace 与 Span 详情',
     logs: '日志',
     logsTooltip: '查看应用程序日志',
     settings: '设置',
@@ -1040,6 +1042,24 @@ const zh: LocaleDefinition = {
     latestEntries: '最新100条日志记录',
     latestEntriesDescription: '最新的应用程序日志。日志由应用程序自动写入。',
     noLogsFound: '未找到日志。',
+  },
+
+  Tracing: {
+    title: 'Tracing',
+    description: '查看 LLM Trace、Span 以及请求/响应元数据。',
+    listTitle: 'Trace 列表',
+    detailTitle: 'Trace 详情',
+    spansTitle: 'Span 列表',
+    eventsTitle: '事件',
+    attributesLabel: '属性',
+    startedAtLabel: '开始时间',
+    durationLabel: '持续时间',
+    spanCountLabel: 'Span 数量',
+    loadError: '加载 Trace 数据失败',
+    emptyDescription: '暂无 Trace 记录，请运行一次 Agent 以采集 Trace。',
+    selectTrace: '请选择一个 Trace 查看详情。',
+    noSpans: '该 Trace 暂无 Span。',
+    noEvents: '暂无事件记录。',
   },
 
   Initialization: {

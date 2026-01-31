@@ -990,6 +990,8 @@ export interface LocaleDefinition {
     toolsPlaygroundTooltip: string;
     usage: string;
     usageTooltip: string;
+    tracing: string;
+    tracingTooltip: string;
     logs: string;
     logsTooltip: string;
     settings: string;
@@ -1045,6 +1047,24 @@ export interface LocaleDefinition {
     latestEntries: string;
     latestEntriesDescription: string;
     noLogsFound: string;
+  };
+
+  Tracing: {
+    title: string;
+    description: string;
+    listTitle: string;
+    detailTitle: string;
+    spansTitle: string;
+    eventsTitle: string;
+    attributesLabel: string;
+    startedAtLabel: string;
+    durationLabel: string;
+    spanCountLabel: string;
+    loadError: string;
+    emptyDescription: string;
+    selectTrace: string;
+    noSpans: string;
+    noEvents: string;
   };
 
   Toast: {

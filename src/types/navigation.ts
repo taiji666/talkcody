@@ -6,6 +6,7 @@ export enum NavigationView {
   MCP_SERVERS = 'mcp-servers',
   TOOLS_PLAYGROUND = 'tools-playground',
   USAGE = 'usage',
+  LLM_TRACING = 'llm-tracing',
   LOGS = 'logs',
   SETTINGS = 'settings',
 }

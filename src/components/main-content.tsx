@@ -1,5 +1,6 @@
 import { AgentsPage } from '@/pages/agents-page';
 import { ExplorerPage } from '@/pages/explorer-page';
+import { LLMTracingPage } from '@/pages/llm-tracing-page';
 import { LogsPage } from '@/pages/logs-page';
 import { MCPServersPage } from '@/pages/mcp-servers-page';
 import { ProjectsPage } from '@/pages/projects-page';
@@ -33,6 +34,8 @@ export function MainContent({ activeView }: MainContentProps) {
       {activeView === NavigationView.TOOLS_PLAYGROUND && <ToolPlayground />}
 
       {activeView === NavigationView.USAGE && <UsageDashboardPage />}
+
+      {activeView === NavigationView.LLM_TRACING && <LLMTracingPage />}
 
       {activeView === NavigationView.LOGS && <LogsPage />}
 
