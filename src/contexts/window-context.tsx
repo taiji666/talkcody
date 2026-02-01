@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type React from 'react';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { logger } from '@/lib/logger';
+import { WindowStateStore } from '@/lib/window-state-store';
 
 interface WindowContextType {
   windowLabel: string;
@@ -23,8 +24,12 @@ export function WindowProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get current window label on mount
     invoke<string>('get_current_window_label')
-      .then((label) => {
+      .then(async (label) => {
         setWindowLabel(label);
+        if (label === 'main') {
+          await WindowStateStore.clearAll();
+          logger.info('[WindowContext] Cleared window state on main window startup');
+        }
       })
       .catch((error) => {
         logger.error('Failed to get window label:', error);

@@ -18,6 +18,67 @@ export interface WindowsState {
 
 const STORE_FILE = 'windows-state.json';
 
+type SanitizedState = {
+  state: WindowsState;
+  changed: boolean;
+};
+
+function sanitizeState(input: WindowsState): SanitizedState {
+  let changed = false;
+  const windows = Array.isArray(input?.windows) ? input.windows : [];
+  if (!Array.isArray(input?.windows)) {
+    changed = true;
+  }
+
+  const deduped: WindowState[] = [];
+  const seenLabels = new Set<string>();
+  const seenRoots = new Set<string>();
+
+  for (let i = windows.length - 1; i >= 0; i -= 1) {
+    const window = windows[i];
+    if (!window || typeof window.label !== 'string' || window.label.trim() === '') {
+      changed = true;
+      continue;
+    }
+
+    const rootPath =
+      typeof window.rootPath === 'string' && window.rootPath.trim() !== ''
+        ? window.rootPath
+        : undefined;
+
+    if (seenLabels.has(window.label)) {
+      changed = true;
+      continue;
+    }
+
+    if (rootPath && seenRoots.has(rootPath)) {
+      changed = true;
+      continue;
+    }
+
+    seenLabels.add(window.label);
+    if (rootPath) {
+      seenRoots.add(rootPath);
+    }
+
+    deduped.push({ ...window, rootPath });
+  }
+
+  deduped.reverse();
+
+  if (deduped.length !== windows.length) {
+    changed = true;
+  }
+
+  return {
+    state: {
+      windows: deduped,
+      lastActive: input?.lastActive,
+    },
+    changed,
+  };
+}
+
 export class WindowStateStore {
   private constructor() {}
 
@@ -28,7 +89,12 @@ export class WindowStateStore {
         return { windows: [] };
       }
       const content = await readTextFile(STORE_FILE, { baseDir: BaseDirectory.AppData });
-      return JSON.parse(content) as WindowsState;
+      const parsed = JSON.parse(content) as WindowsState;
+      const sanitized = sanitizeState(parsed);
+      if (sanitized.changed) {
+        await WindowStateStore.writeData(sanitized.state);
+      }
+      return sanitized.state;
     } catch (error) {
       logger.error('Failed to read window state:', error);
       return { windows: [] };
@@ -36,7 +102,8 @@ export class WindowStateStore {
   }
 
   private static async writeData(data: WindowsState): Promise<void> {
-    await writeTextFile(STORE_FILE, JSON.stringify(data, null, 2), {
+    const sanitized = sanitizeState(data);
+    await writeTextFile(STORE_FILE, JSON.stringify(sanitized.state, null, 2), {
       baseDir: BaseDirectory.AppData,
     });
   }
@@ -46,14 +113,28 @@ export class WindowStateStore {
       const currentState = await WindowStateStore.readData();
 
       const existingIndex = currentState.windows.findIndex((w) => w.label === state.label);
+      let nextState = currentState;
 
       if (existingIndex >= 0) {
         currentState.windows[existingIndex] = state;
       } else {
-        currentState.windows.push(state);
+        const rootPath =
+          typeof state.rootPath === 'string' && state.rootPath.trim() !== ''
+            ? state.rootPath
+            : undefined;
+        const filtered = rootPath
+          ? currentState.windows.filter((w) => w.rootPath !== rootPath)
+          : currentState.windows;
+        if (filtered.length !== currentState.windows.length) {
+          nextState = {
+            ...currentState,
+            windows: filtered,
+          };
+        }
+        nextState.windows.push(state);
       }
 
-      await WindowStateStore.writeData(currentState);
+      await WindowStateStore.writeData(nextState);
     } catch (error) {
       logger.error('Failed to save window state:', error);
     }
@@ -96,10 +177,29 @@ export class WindowStateStore {
 
   static async getWindowsToRestore(): Promise<WindowState[]> {
     try {
-      const state = await WindowStateStore.readData();
+      const state = await WindowStateStore.getWindowsState();
       const windowsToRestore = state.windows.filter((w) => w.label !== 'main' && w.rootPath);
-      logger.info(`Found ${windowsToRestore.length} windows to restore from saved state`);
-      return windowsToRestore;
+      const uniqueByRoot = new Map<string, WindowState>();
+
+      for (const window of windowsToRestore) {
+        if (!window.rootPath) continue;
+        uniqueByRoot.set(window.rootPath, window);
+      }
+
+      const dedupedWindows = Array.from(uniqueByRoot.values());
+
+      if (dedupedWindows.length !== windowsToRestore.length) {
+        await WindowStateStore.clearAll();
+        for (const window of dedupedWindows) {
+          await WindowStateStore.saveWindowState(window);
+        }
+        logger.info(
+          `Deduplicated window restore list from ${windowsToRestore.length} to ${dedupedWindows.length}`
+        );
+      }
+
+      logger.info(`Found ${dedupedWindows.length} windows to restore from saved state`);
+      return dedupedWindows;
     } catch (error) {
       logger.error('Failed to get windows to restore:', error);
       return [];

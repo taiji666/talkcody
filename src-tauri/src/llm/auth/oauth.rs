@@ -18,6 +18,11 @@ const CLAUDE_REDIRECT_URI: &str = "http://localhost:1455/auth/callback";
 const CLAUDE_AUTH_URL: &str = "https://claude.ai/oauth/authorize";
 const CLAUDE_TOKEN_URL: &str = "https://claude.ai/oauth/token";
 
+const GITHUB_COPILOT_ACCESS_TOKEN_KEY: &str = "github_copilot_oauth_access_token";
+const GITHUB_COPILOT_COPILOT_TOKEN_KEY: &str = "github_copilot_oauth_copilot_token";
+const GITHUB_COPILOT_EXPIRES_AT_KEY: &str = "github_copilot_oauth_expires_at";
+const GITHUB_COPILOT_ENTERPRISE_URL_KEY: &str = "github_copilot_oauth_enterprise_url";
+
 const OAUTH_STATE_TIMEOUT: Duration = Duration::from_secs(600); // 10 minutes
 
 /// OAuth state entry with timestamp for expiration
@@ -675,11 +680,11 @@ pub async fn llm_oauth_status(state: State<'_, LlmState>) -> Result<OAuthStatusR
 
     // GitHub Copilot status - only return metadata
     let copilot_access = api_keys
-        .get_setting("github_copilot_oauth_access_token")
+        .get_setting(GITHUB_COPILOT_ACCESS_TOKEN_KEY)
         .await?
         .filter(|s| !s.is_empty());
     let copilot_token = api_keys
-        .get_setting("github_copilot_oauth_copilot_token")
+        .get_setting(GITHUB_COPILOT_COPILOT_TOKEN_KEY)
         .await?
         .filter(|s| !s.is_empty());
 
