@@ -522,7 +522,7 @@ class LspService {
       workspaceFolders: [
         {
           uri: filePathToUri(rootPath),
-          name: rootPath.split('/').pop() || 'workspace',
+          name: rootPath.split(/[/\\]/).filter(Boolean).pop() || 'workspace',
         },
       ],
     };

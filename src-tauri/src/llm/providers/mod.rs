@@ -13,4 +13,5 @@ pub use default_provider::DefaultProvider;
 pub use github_copilot_provider::GithubCopilotProvider;
 pub use moonshot_provider::MoonshotProvider;
 pub use openai_provider::OpenAiProvider;
-pub use provider::{BaseProvider, BuiltRequest, Provider, ProviderContext, ProviderCredentials};
+#[allow(unused_imports)]
+pub use provider::{Provider, ProviderCredentials};

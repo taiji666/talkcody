@@ -4,7 +4,9 @@ import { z } from 'zod';
 import { hookService } from '../services/hooks/hook-service';
 import { hookStateService } from '../services/hooks/hook-state-service';
 import { messageService } from '../services/message-service';
+import { completionHookPipeline } from '../services/agents/llm-completion-hooks';
 import { createLLMService, LLMService } from '../services/agents/llm-service';
+import { stopHookService } from '../services/agents/stop-hook-service';
 import type { AgentLoopOptions, UIMessage } from '../types/agent';
 import { createLlmEventStream, createTextOnlyEvents } from './utils/llm-client-mock';
 
@@ -191,6 +193,9 @@ describe('ChatService.runManualAgentLoop', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+
+    completionHookPipeline.clear();
+    completionHookPipeline.register(stopHookService);
 
     // Re-establish mock implementations after clearing
     // Import the mocked module to access mock functions
@@ -456,6 +461,31 @@ describe('ChatService.runManualAgentLoop', () => {
   });
 
   describe('Error handling', () => {
+    it('should reject with AbortError when aborted before stop hook', async () => {
+      const abortController = new AbortController();
+      mockStreamText.mockReturnValue(
+        createLlmEventStream([{ type: 'done', finish_reason: 'stop' }])
+      );
+
+      vi.mocked(hookService.runStop).mockResolvedValue({
+        blocked: false,
+        continue: true,
+        additionalContext: [],
+      });
+
+      const options = createBasicOptions();
+
+      const runPromise = chatService.runAgentLoop(options, mockCallbacks, abortController);
+      abortController.abort();
+
+      await expect(runPromise).rejects.toThrow('Aborted');
+
+      expect(mockCallbacks.onError).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'AbortError' })
+      );
+      expect(hookService.runStop).not.toHaveBeenCalled();
+    });
+
     it('should reject with AbortError when aborted before loop iteration', async () => {
       const abortController = new AbortController();
       abortController.abort();

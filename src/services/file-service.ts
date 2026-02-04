@@ -83,8 +83,11 @@ export class FileService {
     await this.ensureAttachmentsDirectory();
 
     const attachmentsPath = await this.getAttachmentsPath();
-    const fileExtension = originalFilename.split('.').pop() || '';
-    const uniqueFilename = `${Date.now()}-${originalFilename}.${fileExtension}`;
+    const lastDot = originalFilename.lastIndexOf('.');
+    const hasExtension = lastDot > 0;
+    const baseName = hasExtension ? originalFilename.slice(0, lastDot) : originalFilename;
+    const fileExtension = hasExtension ? originalFilename.slice(lastDot + 1) : '';
+    const uniqueFilename = `${Date.now()}-${baseName}${fileExtension ? `.${fileExtension}` : ''}`;
     const targetPath = await join(attachmentsPath, uniqueFilename);
 
     const fileData = await readFile(sourcePath);
@@ -146,7 +149,9 @@ export class FileService {
   }
 
   getFilenameFromPath(filePath: string): string {
-    return filePath.split('/').pop() || filePath.split('\\').pop() || 'unknown';
+    const normalizedPath = filePath.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (!normalizedPath) return 'unknown';
+    return normalizedPath.split('/').pop() || 'unknown';
   }
 
   async getFileSize(filePath: string): Promise<number> {

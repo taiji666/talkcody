@@ -2,6 +2,7 @@
 import { logger } from '@/lib/logger';
 import { useProviderStore } from '@/providers/stores/provider-store';
 import { commandRegistry } from '@/services/commands/command-registry';
+import { executionService } from '@/services/execution-service';
 import { hookSnapshotService } from '@/services/hooks/hook-snapshot-service';
 import { terminalService } from '@/services/terminal-service';
 import { useAgentStore } from '@/stores/agent-store';
@@ -172,6 +173,11 @@ class InitializationManager {
           // LSP settings (sync from persisted settings)
           Promise.resolve(initializeLspSettings()).then(() => {
             logger.info('[InitManager] ✓ LSP settings initialized (background)');
+          }),
+
+          // Completion hooks (stop hook, ralph loop, auto code review)
+          Promise.resolve(executionService.registerCompletionHooks()).then(() => {
+            logger.info('[InitManager] ✓ Completion hooks registered (background)');
           }),
         ]);
 

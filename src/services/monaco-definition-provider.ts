@@ -88,8 +88,10 @@ function getImportPathAtPosition(
 
 // Helper function to resolve relative paths
 function resolvePath(basePath: string, relativePath: string): string {
-  const parts = basePath.split('/').filter(Boolean);
+  const normalizedBase = basePath.replace(/\\/g, '/').replace(/\/$/, '');
+  const parts = normalizedBase.split('/').filter(Boolean);
   const relParts = relativePath.split('/');
+  const rootPrefix = normalizedBase.startsWith('/') ? '/' : '';
 
   for (const part of relParts) {
     if (part === '..') {
@@ -99,7 +101,7 @@ function resolvePath(basePath: string, relativePath: string): string {
     }
   }
 
-  return `/${parts.join('/')}`;
+  return `${rootPrefix}${parts.join('/')}`;
 }
 
 // File extension mappings for languages without explicit extensions
@@ -133,7 +135,9 @@ async function resolveImportPath(
   rootPath: string
 ): Promise<string | null> {
   const possiblePaths: string[] = [];
-  const currentDir = currentFile.substring(0, currentFile.lastIndexOf('/'));
+  const currentDir = currentFile
+    ? currentFile.replace(/\\/g, '/').substring(0, currentFile.replace(/\\/g, '/').lastIndexOf('/'))
+    : '';
 
   switch (langId) {
     case 'typescript':

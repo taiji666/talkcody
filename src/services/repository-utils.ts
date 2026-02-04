@@ -1,7 +1,13 @@
 // src/services/repository-utils.ts
 import { join, normalize } from '@tauri-apps/api/path';
 
-const WINDOWS_PATH_REGEX = /^[a-zA-Z]:\\/;
+const WINDOWS_PATH_REGEX = /^[a-zA-Z]:[\\/]/;
+
+const PATH_SEPARATOR_REGEX = /[\\/]+/;
+
+function normalizeSeparators(path: string): string {
+  return path.replace(/\\/g, '/');
+}
 
 /**
  * Normalize file path by handling relative paths and path normalization
@@ -10,8 +16,14 @@ const WINDOWS_PATH_REGEX = /^[a-zA-Z]:\\/;
  * @returns Normalized absolute file path
  */
 export async function normalizeFilePath(rootPath: string, filePath: string): Promise<string> {
-  // If filePath is already an absolute path, return it directly
-  if (filePath.startsWith('/') || filePath.match(WINDOWS_PATH_REGEX)) {
+  const isAbsolute =
+    filePath.startsWith('/') ||
+    WINDOWS_PATH_REGEX.test(filePath) ||
+    filePath.startsWith('\\\\') ||
+    filePath.startsWith('//') ||
+    filePath.startsWith('\\\\?\\');
+
+  if (isAbsolute) {
     return await normalize(filePath);
   }
   // If filePath is relative, join it with rootPath to form absolute path
@@ -21,7 +33,10 @@ export async function normalizeFilePath(rootPath: string, filePath: string): Pro
 }
 
 export function getFileNameFromPath(path: string): string {
-  return path.split('/').pop() || path.split('\\').pop() || path;
+  const normalizedPath = normalizeSeparators(path).replace(/\/+$/, '');
+  if (!normalizedPath) return path;
+
+  return normalizedPath.split(PATH_SEPARATOR_REGEX).filter(Boolean).pop() || path;
 }
 
 export function getFileExtension(filename: string): string {
@@ -30,8 +45,8 @@ export function getFileExtension(filename: string): string {
 
 export function getFullPath(basePath: string, filePath: string): string {
   // Normalize paths to handle different separators
-  const normalizedBasePath = basePath.replace(/\\/g, '/').replace(/\/$/, '');
-  const normalizedFilePath = filePath.replace(/\\/g, '/');
+  const normalizedBasePath = normalizeSeparators(basePath).replace(/\/$/, '');
+  const normalizedFilePath = normalizeSeparators(filePath);
 
   // Check if filePath already contains basePath
   if (
@@ -179,8 +194,11 @@ export function isCodeFile(filename: string): boolean {
  * Get relative path by removing repository path prefix
  */
 export function getRelativePath(fullPath: string, repositoryPath: string): string {
-  if (fullPath.startsWith(repositoryPath)) {
-    return fullPath.substring(repositoryPath.length + 1);
+  const normalizedFullPath = normalizeSeparators(fullPath);
+  const normalizedRepositoryPath = normalizeSeparators(repositoryPath).replace(/\/$/, '');
+
+  if (normalizedFullPath.startsWith(`${normalizedRepositoryPath}/`)) {
+    return normalizedFullPath.substring(normalizedRepositoryPath.length + 1);
   }
   return fullPath;
 }

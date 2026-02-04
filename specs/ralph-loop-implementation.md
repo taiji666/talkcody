@@ -34,42 +34,87 @@ Ralph Loop implements a controlled iteration loop where:
 - **Transparent**: Each iteration's state is visible and inspectable
 - **Configurable**: Stop criteria and behavior are tunable per task
 
-## Architecture
+## Architecture (Redesigned - Stop-Hook Style)
 
 ### System Integration
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      ExecutionService                        │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │  Check Ralph Loop Enabled?                              ││
-│  └──────────────────┬──────────────────────────────────────┘│
-│                     │ Yes                                     │
-│                     ▼                                         │
-│  ┌─────────────────────────────────────────────────────────┐│
-│  │              RalphLoopService                            ││
-│  │  ┌───────────────────────────────────────────────────┐  ││
-│  │  │  Loop:                                           │  ││
-│  │  │  1. Build iteration messages                    │  ││
-│  │  │  2. Run iteration (LLM agent)                   │  ││
-│  │  │  3. Evaluate stop criteria                      │  ││
-│  │  │  4. Persist artifacts                           │  ││
-│  │  │  5. Update feedback/summary                     │  ││
-│  │  └───────────────────────────────────────────────────┘  ││
-│  └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ExecutionService                              │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Call llmService.runAgentLoop (no Ralph branching)              ││
+│  └──────────────────┬──────────────────────────────────────────────┘│
+└─────────────────────┼───────────────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        LLMService.runAgentLoop                       │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Agent Loop (inner)                                             ││
+│  │  ┌───────────────────────────────────────────────────────────┐  ││
+│  │  │  While !isComplete && iteration < maxIterations:          │  ││
+│  │  │    - Stream LLM response                                  │  ││
+│  │  │    - Execute tools                                        │  ││
+│  │  │    - Check stop criteria                                  │  ││
+│  │  └───────────────────────────────────────────────────────────┘  ││
+│  └──────────────────┬──────────────────────────────────────────────┘│
+│                     │ Successful Finish (no tool calls)             │
+│                     ▼                                             │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │  Completion Hook Pipeline                                       ││
+│  │  ┌───────────────────────────────────────────────────────────┐  ││
+│  │  │  1. Stop Hook (existing)                                  │  ││
+│  │  │     - Can block/continue with user message                │  ││
+│  │  └───────────────────────────────────────────────────────────┘  ││
+│  │  ┌───────────────────────────────────────────────────────────┐  ││
+│  │  │  2. Ralph Loop Hook (new)                                 │  ││
+│  │  │     - Evaluate stop criteria                              │  ││
+│  │  │     - Persist artifacts                                   │  ││
+│  │  │     - Decide: stop or continue with fresh context         │  ││
+│  │  └───────────────────────────────────────────────────────────┘  ││
+│  │  ┌───────────────────────────────────────────────────────────┐  ││
+│  │  │  3. Auto Code Review (existing)                           │  ││
+│  │  │     - Only if both above allow stop                       │  ││
+│  │  └───────────────────────────────────────────────────────────┘  ││
+│  └──────────────────┬──────────────────────────────────────────────┘│
+│                     │ If Ralph requests continue:                   │
+│                     │   - Reset loopState.messages                  │
+│                     │   - Reset streamProcessor                     │
+│                     │   - Continue outer loop                       │
+└─────────────────────────────────────────────────────────────────────┘
 ```
+
+### Why This Redesign?
+
+**Previous Architecture Issues:**
+1. `RalphLoopService.runLoop` called `llmService.runAgentLoop` internally, creating nested loops
+2. Duplicate message streaming logic in both services
+3. Ralph bypassed the stop hook and auto code review sequencing in LLMService
+4. Complex branching in ExecutionService
+
+**New Architecture Benefits:**
+1. **Single source of truth**: LLMService owns the loop orchestration
+2. **Proper sequencing**: Stop hook → Ralph → Auto review in deterministic order
+3. **Cleaner separation**: Ralph is a completion evaluator, not a loop runner
+4. **Extensibility**: Completion hook pipeline allows easy addition of new hooks
 
 ### File Structure
 
 ```
 src/
 ├── types/
-│   └── ralph-loop.ts              # Type definitions
+│   ├── ralph-loop.ts              # Type definitions
+│   └── completion-hooks.ts        # NEW: Completion hook interfaces
 ├── services/
 │   └── agents/
-│       ├── ralph-loop-service.ts  # Core orchestration
-│       └── ralph-loop-service.test.ts
+│       ├── ralph-loop-service.ts  # Core evaluator (refactored)
+│       ├── ralph-loop-service.test.ts
+│       ├── llm-service.ts         # Added completion hook pipeline
+│       ├── llm-completion-hooks.ts # NEW: Hook pipeline manager
+│       ├── tool-executor.ts       # Added onToolResult callback
+│       └── stream-processor.ts    # Already has fullReset()
+├── services/
+│   └── execution-service.ts       # Simplified (no Ralph branching)
 ├── stores/
 │   └── ralph-loop-store.ts        # State management
 ├── components/
@@ -122,140 +167,373 @@ export type RalphLoopStopReason =
   | 'unknown';      // Unknown state
 ```
 
-#### Memory Strategy
+#### Completion Hook Types (NEW)
 
 ```typescript
-export interface RalphLoopMemoryStrategy {
-  summaryFileName: string;        // 'ralph-summary.md'
-  feedbackFileName: string;       // 'ralph-feedback.md'
-  stateFileName: string;          // 'ralph-iteration.json'
+// src/types/completion-hooks.ts
+
+export interface CompletionHookContext {
+  taskId: string;
+  fullText: string;
+  toolSummaries: ToolSummary[];
+  loopState: AgentLoopState;
+  iteration: number;
+  startTime: number;
+}
+
+export interface CompletionHookResult {
+  action: 'stop' | 'continue' | 'skip';
+  stopReason?: RalphLoopStopReason;
+  stopMessage?: string;
+  nextMessages?: UIMessage[];  // For 'continue' action
+}
+
+export interface CompletionHook {
+  name: string;
+  priority: number;  // Lower = earlier
+  shouldRun: (context: CompletionHookContext) => boolean;
+  run: (context: CompletionHookContext) => Promise<CompletionHookResult>;
+}
+
+export interface ToolSummary {
+  toolName: string;
+  toolCallId: string;
+  command?: string;      // For bash tool
+  success?: boolean;
+  output?: string;
+  error?: string;
 }
 ```
 
-#### Context Freshness
+### Completion Hook Pipeline (NEW)
+
+The completion hook pipeline runs after a successful agent loop finish (no tool calls):
 
 ```typescript
-export interface RalphLoopContextFreshness {
-  includeLastNMessages?: number;   // Number of previous messages to include (default: 0)
-}
-```
+// src/services/agents/llm-completion-hooks.ts
 
-### RalphLoopService
+export class CompletionHookPipeline {
+  private hooks: CompletionHook[] = [];
 
-The `RalphLoopService` is the core orchestrator for Ralph Loop execution.
+  register(hook: CompletionHook): void {
+    this.hooks.push(hook);
+    // Sort by priority (lower = earlier)
+    this.hooks.sort((a, b) => a.priority - b.priority);
+  }
 
-#### Main Loop
+  async run(context: CompletionHookContext): Promise<CompletionHookResult> {
+    for (const hook of this.hooks) {
+      if (!hook.shouldRun(context)) {
+        continue;
+      }
 
-```typescript
-async runLoop(options: RalphLoopRunOptions): Promise<RalphLoopRunResult> {
-  // Initialize
-  const startTime = Date.now();
-  let iterations = 0;
-  let stopReason: RalphLoopStopReason = 'unknown';
+      const result = await hook.run(context);
 
-  while (iterations < config.maxIterations) {
-    // Check abort
-    if (abortController.signal.aborted) break;
+      if (result.action === 'continue') {
+        // Early termination - request to continue with new context
+        return result;
+      }
 
-    // Check wall time
-    if (Date.now() - startTime > config.maxWallTimeMs) {
-      stopReason = 'max-wall-time';
-      break;
+      if (result.action === 'stop') {
+        // Stop the entire execution
+        return result;
+      }
+
+      // 'skip' - continue to next hook
     }
 
-    // Run iteration
-    const iterationResult = await this.runIteration(...);
+    // All hooks passed, allow stop
+    return { action: 'stop' };
+  }
+}
+
+// Singleton instance
+export const completionHookPipeline = new CompletionHookPipeline();
+```
+
+### Ralph Loop as Completion Hook
+
+```typescript
+// src/services/agents/ralph-loop-service.ts (refactored)
+
+export class RalphLoopService implements CompletionHook {
+  name = 'ralph-loop';
+  priority = 20;  // After stop hook (10), before auto review (30)
+
+  shouldRun(context: CompletionHookContext): boolean {
+    return isRalphLoopEnabled(context.taskId);
+  }
+
+  async run(context: CompletionHookContext): Promise<CompletionHookResult> {
+    const { taskId, fullText, toolSummaries, loopState, iteration, startTime } = context;
+
+    // Check max iterations
+    if (iteration >= DEFAULT_CONFIG.maxIterations) {
+      await this.persistFinalState({
+        taskId,
+        iteration,
+        startTime,
+        stopReason: 'max-iterations',
+        stopMessage: 'Reached max iterations',
+      });
+      return { action: 'stop', stopReason: 'max-iterations' };
+    }
+
+    // Check wall time
+    const elapsed = Date.now() - startTime;
+    if (elapsed > DEFAULT_CONFIG.maxWallTimeMs) {
+      await this.persistFinalState({
+        taskId,
+        iteration,
+        startTime,
+        stopReason: 'max-wall-time',
+        stopMessage: 'Reached max wall time',
+      });
+      return { action: 'stop', stopReason: 'max-wall-time' };
+    }
 
     // Evaluate stop criteria
-    const evaluation = this.evaluateStopCriteria(...);
+    const evaluation = this.evaluateStopCriteria({
+      fullText,
+      toolSummaries,
+      stopCriteria: DEFAULT_CONFIG.stopCriteria,
+    });
 
-    // Persist artifacts
-    await this.persistIterationArtifacts(...);
+    // Persist iteration artifacts
+    await this.persistIterationArtifacts({
+      taskId,
+      iteration,
+      startTime,
+      fullText,
+      toolSummaries,
+      evaluation,
+    });
 
-    // Check if should stop
     if (evaluation.shouldStop) {
-      stopReason = evaluation.stopReason;
-      break;
+      return {
+        action: 'stop',
+        stopReason: evaluation.stopReason,
+        stopMessage: evaluation.stopMessage,
+      };
+    }
+
+    // Continue with fresh context
+    const nextMessages = await this.buildIterationMessages({
+      taskId,
+      userMessage: this.getBaseUserMessage(taskId),
+      includeLastN: DEFAULT_CONFIG.context.includeLastNMessages,
+    });
+
+    return {
+      action: 'continue',
+      nextMessages,
+    };
+  }
+
+  // ... other methods: evaluateStopCriteria, persistIterationArtifacts, etc.
+}
+
+export const ralphLoopService = new RalphLoopService();
+```
+
+### LLMService Integration
+
+```typescript
+// src/services/agents/llm-service.ts (relevant parts)
+
+export class LLMService {
+  private toolSummaries: ToolSummary[] = [];
+  private ralphIteration = 0;
+  private ralphStartTime = 0;
+
+  async runAgentLoop(
+    options: AgentLoopOptions,
+    callbacks: AgentLoopCallbacks,
+    abortController?: AbortController
+  ): Promise<void> {
+    // ... initialization ...
+
+    this.ralphStartTime = Date.now();
+    this.ralphIteration = 0;
+
+    while (true) {
+      this.ralphIteration++;
+
+      // Reset tool summaries for this iteration
+      this.toolSummaries = [];
+
+      // ... main agent loop ...
+
+      // After successful finish (no tool calls)
+      if (toolCalls.length === 0) {
+        const fullText = streamProcessor.getFullText();
+
+        // Build completion context
+        const completionContext: CompletionHookContext = {
+          taskId: this.taskId,
+          fullText,
+          toolSummaries: this.toolSummaries,
+          loopState,
+          iteration: this.ralphIteration,
+          startTime: this.ralphStartTime,
+        };
+
+        // Run completion hook pipeline
+        const result = await completionHookPipeline.run(completionContext);
+
+        if (result.action === 'continue' && result.nextMessages) {
+          // Ralph wants to continue with fresh context
+
+          // 1. Reset loopState.messages
+          const newModelMessages = await convertMessages(result.nextMessages, {
+            rootPath,
+            systemPrompt: options.systemPrompt,
+            model: options.model,
+          });
+
+          loopState.messages = convertToAnthropicFormat(newModelMessages, {
+            autoFix: true,
+            trimAssistantWhitespace: true,
+          });
+
+          // 2. Reset other loopState fields
+          loopState.lastRequestTokens = 0;
+          loopState.unknownFinishReasonCount = 0;
+          loopState.lastFinishReason = undefined;
+
+          // 3. Reset stream processor for fresh iteration
+          streamProcessor.fullReset();
+
+          // 4. Continue the outer loop
+          continue;
+        }
+
+        if (result.action === 'stop') {
+          // Finalize and exit
+          onComplete?.(fullText);
+          break;
+        }
+      }
+
+      // ... handle tool calls ...
     }
   }
 
-  return { success, fullText, stopReason, iterations };
+  // Capture tool results for Ralph evaluation
+  private onToolResult(toolName: string, result: unknown, toolCallId: string): void {
+    const summary: ToolSummary = {
+      toolName,
+      toolCallId,
+    };
+
+    if (toolName === 'bash' && isBashResult(result)) {
+      summary.command = result.command;
+      summary.success = result.success;
+      summary.output = result.output;
+      summary.error = result.error;
+    } else if (result && typeof result === 'object' && 'error' in result) {
+      summary.error = String((result as { error?: string }).error);
+    }
+
+    this.toolSummaries.push(summary);
+  }
 }
 ```
 
-#### Iteration Message Building
+### Tool Result Capture
 
-Each iteration receives a context that includes:
-
-1. **Task**: The original user request
-2. **Ralph Summary**: Accumulated summary from previous iterations
-3. **Ralph Feedback**: Feedback and error information from previous iterations
-4. **Recent Messages**: Optional N recent messages (if `includeLastNMessages` > 0)
+To enable Ralph to evaluate tool results, we capture structured tool outputs:
 
 ```typescript
-const promptSections = [
-  '## Task',
-  userMessage,
-];
+// src/services/agents/tool-executor.ts (modification)
 
-if (summary) {
-  promptSections.push('## Ralph Summary', summary);
-}
+export class ToolExecutor {
+  async executeToolCall(
+    toolCall: ToolCallInfo,
+    options: ToolExecutionOptions,
+    onToolResult?: (toolName: string, result: unknown, toolCallId: string) => void
+  ): Promise<unknown> {
+    // ... execute tool ...
 
-if (feedback) {
-  promptSections.push('## Ralph Feedback', feedback);
+    const result = await this.executeTool(tool, parsedArgs, context);
+
+    // Notify callback with structured result
+    onToolResult?.(toolCall.toolName, result, toolCall.toolCallId);
+
+    return result;
+  }
 }
 ```
 
-#### Stop Criteria Evaluation
-
-The service evaluates multiple conditions to determine if the loop should stop:
-
-1. **Blocked Marker**: Check if `<ralph>BLOCKED:reason</ralph>` appears in output
-2. **Completion Marker**: Check if `<ralph>COMPLETE</ralph>` appears in output
-3. **Test Results**: Parse tool results for test commands (if `requirePassingTests`)
-4. **Lint Results**: Parse tool results for lint commands (if `requireLint`)
-5. **Type Check Results**: Parse tool results for tsc commands (if `requireTsc`)
-6. **Error Count**: Check if any errors occurred (if `requireNoErrors`)
-
-#### Tool Command Pattern Matching
-
-The service recognizes common command patterns:
+### ExecutionService Simplification
 
 ```typescript
-const TEST_COMMAND_PATTERNS = [
-  /^bun\s+run\s+test(\b|:)/,
-  /^npm\s+(run\s+)?test(\b|:)/,
-  /^yarn\s+test(\b|:)/,
-  /^pnpm\s+test(\b|:)/,
-  /^vitest(\b|\s)/,
-  /^jest(\b|\s)/,
-  /^pytest(\b|\s)/,
-  /^cargo\s+test(\b|\s)/,
-  /^go\s+test(\b|\s)/,
-];
+// src/services/execution-service.ts (simplified)
 
-const LINT_COMMAND_PATTERNS = [
-  /^bun\s+run\s+lint(\b|:)/,
-  /^npm\s+(run\s+)?lint(\b|:)/,
-  /^yarn\s+lint(\b|:)/,
-  /^pnpm\s+lint(\b|:)/,
-  /^eslint(\b|\s)/,
-  /^biome(\b|\s)/,
-  /^ruff(\b|\s)/,
-];
+class ExecutionService {
+  async startExecution(config: ExecutionConfig, callbacks?: ExecutionCallbacks): Promise<void> {
+    // ... setup ...
 
-const TSC_COMMAND_PATTERNS = [
-  /^bun\s+run\s+tsc(\b|:)/,
-  /^tsc(\b|\s)/
-];
+    try {
+      // Create LLMService instance
+      llmService = createLLMService(taskId);
+      this.llmServiceInstances.set(taskId, llmService);
+
+      // Register completion hooks (done once at app startup)
+      // completionHookPipeline.register(stopHookService);  // priority 10
+      // completionHookPipeline.register(ralphLoopService); // priority 20
+      // completionHookPipeline.register(autoCodeReviewService); // priority 30
+
+      // Always call runAgentLoop - Ralph behavior is handled via completion hooks
+      await llmService.runAgentLoop(
+        {
+          messages,
+          model,
+          systemPrompt,
+          tools,
+          agentId,
+        },
+        {
+          // ... callbacks ...
+        },
+        abortController
+      );
+
+    } catch (error) {
+      // ... error handling ...
+    }
+  }
+}
 ```
 
-### Memory Persistence
+### LoopState Reset (per your request)
 
-#### Summary File (`ralph-summary.md`)
+When Ralph decides to continue:
 
-Each iteration updates a cumulative summary that includes:
+1. **Clear `loopState.messages`**: Replace with fresh iteration messages built from task + summary + feedback
+2. **Reset `loopState.lastRequestTokens`**: Fresh context has new token count
+3. **Reset `loopState.unknownFinishReasonCount`**: Fresh iteration should not carry retry state
+4. **Reset `loopState.lastFinishReason`**: Fresh start
+5. **Reset `streamProcessor`**: Call `fullReset()` to clear accumulated text and state
+
+The `loopState.currentIteration` continues incrementing (it's the agent's internal step counter, not Ralph's iteration counter).
+
+## Memory Persistence
+
+### When Artifacts Are Written
+
+**Only on successful finish (no tool calls):**
+- Ralph hook evaluates stop criteria
+- If continuing: `persistIterationArtifacts()` writes iteration state
+- If stopping: `persistFinalState()` writes final state
+
+**NOT written on errors:**
+- If the agent loop throws, artifacts are not updated
+- This prevents corrupted state from error conditions
+
+### Summary File (`ralph-summary.md`)
+
+Each iteration updates a cumulative summary:
 
 ```markdown
 # Ralph Loop Summary
@@ -287,7 +565,7 @@ Stop message: [if applicable]
 [Previous iteration's summary]
 ```
 
-#### State File (`ralph-iteration.json`)
+### State File (`ralph-iteration.json`)
 
 Persists iteration state for inspection:
 
@@ -301,118 +579,6 @@ Persists iteration state for inspection:
   "stopMessage": "Task completed",
   "completionPromiseMatched": true,
   "errors": []
-}
-```
-
-### State Management
-
-#### RalphLoopStore
-
-Uses Zustand for UI state management:
-
-```typescript
-interface RalphLoopState {
-  isRalphLoopEnabled: boolean;
-  initialize: () => void;
-  toggleRalphLoop: () => void;
-  setRalphLoop: (enabled: boolean) => void;
-}
-```
-
-The store syncs with the settings database:
-
-```typescript
-toggleRalphLoop: () => {
-  const newState = !currentState;
-  set({ isRalphLoopEnabled: newState });
-  await useSettingsStore.getState().setRalphLoopEnabled(newState);
-}
-```
-
-### Settings Integration
-
-#### Global Toggle
-
-Users can enable/disable Ralph Loop globally via:
-
-- Settings database key: `is_ralph_loop_enabled`
-- UI: Chat input toggle switch
-- Store: `useSettingsStore.getRalphLoopEnabled()`
-
-#### Per-Task Override
-
-Individual tasks can override the global setting:
-
-```typescript
-interface TaskSettings {
-  ralphLoopEnabled?: boolean;
-}
-```
-
-The service checks:
-
-1. Task-specific setting (if present)
-2. Global setting (fallback)
-
-### Integration with ExecutionService
-
-The execution service branches based on Ralph Loop state:
-
-```typescript
-if (useSettingsStore.getState().getRalphLoopEnabled()) {
-  // Ralph Loop path
-  const result = await ralphLoopService.runLoop({
-    taskId,
-    messages,
-    model,
-    systemPrompt,
-    tools,
-    agentId,
-    userMessage: config.userMessage,
-    llmService,
-    abortController,
-    onStatus,
-    onAttachment,
-  });
-  await handleCompletion(result.fullText);
-} else {
-  // Standard single-pass path
-  await llmService.runAgentLoop(...);
-}
-```
-
-## Completion Promise
-
-The AI agent is instructed to output specific markers:
-
-### System Prompt Additions
-
-```typescript
-const COMPLETION_PROMISE = [
-  'Ralph Loop completion promise:',
-  '- When the task is fully done, output exactly: <ralph>COMPLETE</ralph>',
-  '- If blocked, output exactly: <ralph>BLOCKED: reason</ralph>',
-].join('\n');
-```
-
-### Stop Rules
-
-Additional stop criteria are added to the system prompt:
-
-```typescript
-const stopRules: string[] = [];
-
-if (config.stopCriteria.requirePassingTests) {
-  stopRules.push('- Run tests and ensure they pass before completion.');
-}
-if (config.stopCriteria.requireLint) {
-  stopRules.push('- Run lint and fix all lint errors before completion.');
-}
-if (config.stopCriteria.requireTsc) {
-  stopRules.push('- Run typecheck (tsc) and fix all errors before completion.');
-}
-if (config.stopCriteria.requireNoErrors) {
-  stopRules.push('- Do not declare completion if any tool or execution errors occurred.');
 }
 ```
 
@@ -478,10 +644,25 @@ The implementation includes comprehensive tests:
 
 ```typescript
 describe('RalphLoopService', () => {
-  it('stops when completion marker appears');
-  it('stops when blocked marker appears');
-  it('writes iteration artifacts');
-  it('respects max iteration limit');
+  it('evaluates stop criteria correctly');
+  it('persists iteration artifacts on successful finish');
+  it('returns continue action when criteria not met');
+  it('returns stop action when max iterations reached');
+  it('returns stop action when completion marker found');
+  it('returns stop action when blocked marker found');
+});
+
+describe('LLMService Completion Hooks', () => {
+  it('runs completion hook pipeline on successful finish');
+  it('continues loop when Ralph requests continuation');
+  it('resets loopState.messages on continuation');
+  it('resets streamProcessor on continuation');
+  it('captures structured tool results');
+});
+
+describe('ExecutionService', () => {
+  it('calls llmService.runAgentLoop without Ralph branching');
+  it('handles Ralph continuation correctly');
 });
 ```
 
@@ -489,8 +670,9 @@ describe('RalphLoopService', () => {
 
 - Mock dependencies (messageService, taskFileService, stores)
 - Simulate agent loop execution
-- Verify stop criteria evaluation
+- Verify completion hook sequencing
 - Validate artifact persistence
+- Test loopState reset behavior
 - Test boundary conditions (max iterations, wall time)
 
 ## Configuration Examples
@@ -546,158 +728,142 @@ const taskSettings: TaskSettings = {
 
 ## Flow Diagram
 
+### New Architecture Flow
+
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    User Request                          │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-         ┌───────────────────────┐
-         │  Ralph Loop Enabled?  │
-         └───────────┬───────────┘
-                     │ Yes
-                     ▼
-         ┌───────────────────────┐
-         │  Start Loop            │
-         │  iterations = 0        │
-         └───────────┬───────────┘
-                     │
-                     ▼
-         ┌───────────────────────┐
-         │  iteration += 1        │
-         └───────────┬───────────┘
-                     │
-                     ▼
-         ┌───────────────────────┐
-         │  Build Context:       │
-         │  - Task               │
-         │  - Summary            │
-         │  - Feedback           │
-         └───────────┬───────────┘
-                     │
-                     ▼
-         ┌───────────────────────┐
-         │  Run AI Agent         │
-         │  - Execute tools      │
-         │  - Collect output     │
-         └───────────┬───────────┘
-                     │
-                     ▼
-         ┌───────────────────────┐
-         │  Evaluate:            │
-         │  - Blocked marker?    │◄──┐
-         │  - Complete marker?   │   │
-         │  - Tests passed?      │   │
-         │  - Lint passed?       │   │
-         │  - No errors?         │   │
-         └───────────┬───────────┘   │
-                     │               │
-          ┌──────────┴──────────┐    │
-          │                     │    │
-          ▼ Yes                 ▼ No  │
-    ┌───────────┐         ┌──────────┴──┐
-    │ Stop Loop │         │ Continue    │
-    └─────┬─────┘         └─────┬──────┘
-          │                     │
-          ▼                     │
-    ┌───────────┐               │
-    │ Persist   │               │
-    │ Final     │               │
-    │ State     │               │
-    └─────┬─────┘               │
-          │                     │
-          └─────────────────────┘
-                     │
-                     ▼
-         ┌───────────────────────┐
-         │  Return Result        │
-         └───────────────────────┘
+User Request
+    │
+    ▼
+┌─────────────────┐
+│ ExecutionService │
+│  (no branching)  │
+└────────┬────────┘
+         │
+         ▼
+┌──────────────────────────────────┐
+│      LLMService.runAgentLoop     │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │    Agent Loop (inner)      │  │
+│  │  - Stream LLM              │  │
+│  │  - Execute tools           │  │
+│  │  - Build tool summaries    │  │
+│  └────────┬───────────────────┘  │
+│           │ No tool calls        │
+│           ▼                      │
+│  ┌────────────────────────────┐  │
+│  │   Completion Hook Pipeline │  │
+│  │                            │  │
+│  │  1. Stop Hook              │  │
+│  │     ├─ Block → Stop        │  │
+│  │     └─ Continue → Next     │  │
+│  │                            │  │
+│  │  2. Ralph Loop Hook        │  │
+│  │     ├─ Stop criteria met   │  │
+│  │     │  ├─ Persist artifacts│  │
+│  │     │  └─ Stop             │  │
+│  │     └─ Continue needed     │  │
+│  │        ├─ Persist artifacts│  │
+│  │        ├─ Reset loopState  │  │
+│  │        └─ Continue loop ──┐│  │
+│  │                            ││  │
+│  │  3. Auto Code Review       ││  │
+│  │     └─ Only if stopping    ││  │
+│  └────────────────────────────┘│  │
+│           │                    │  │
+│           ▼ Continue           │  │
+│  ┌────────────────────────────┐│  │
+│  │  Reset loopState.messages  ││  │
+│  │  Reset streamProcessor     ││  │
+│  └────────────────────────────┘│  │
+│           │                    │  │
+│           └────────────────────┘  │
+│                    │               │
+│                    ▼               │
+│           ┌──────────────┐         │
+│           │ Next Iteration│◄────────┘
+│           └──────────────┘
+│
+└──────────────────────────────────┘
 ```
 
 ## Key Design Decisions
 
-### 1. Fresh Context per Iteration
+### 1. Completion Hook Pipeline
 
-**Decision:** Each iteration starts with a clean context window, avoiding token bloat from accumulating messages.
-
-**Rationale:**
-- Prevents context window overflow
-- Encourages concise, focused iterations
-- Reduces cost per iteration
-- Improves reasoning quality by reducing noise
-
-### 2. Summary-Based Memory
-
-**Decision:** Persist high-signal information (summary, feedback) instead of raw messages.
+**Decision:** Use a pluggable completion hook pipeline (Option B) instead of inline logic (Option A).
 
 **Rationale:**
-- Maintains learning between iterations
-- Provides a clean, structured representation
-- Enables the agent to build on previous work
-- More efficient than storing all messages
+- Clear separation of concerns
+- Deterministic execution order
+- Easy to add new hooks
+- Follows open/closed principle
+- Makes LLMService more extensible
 
-### 3. Explicit Completion Marker
+### 2. Ralph as Completion Hook, Not Loop Runner
 
-**Decision:** Require the AI to explicitly output `<ralph>COMPLETE</ralph>` to declare completion.
-
-**Rationale:**
-- Clear, unambiguous signal
-- Allows the AI to reason about completion
-- Prevents premature stopping
-- Enables debugging (can see why agent thinks it's done)
-
-### 4. Multiple Stop Criteria
-
-**Decision:** Support configurable stop criteria (tests, lint, tsc, errors) beyond just the completion marker.
+**Decision:** RalphLoopService implements `CompletionHook` interface instead of running its own loop.
 
 **Rationale:**
-- Verifies code quality before declaring done
-- Ensures automated checks pass
-- Allows strict enforcement of standards
-- Reduces need for human review of failures
+- Single source of truth for loop orchestration
+- Proper integration with stop hook and auto review
+- Eliminates nested loop complexity
+- Simplifies message streaming
 
-### 5. Configurable Per Task
+### 3. Fresh Context on Continuation
 
-**Decision:** Allow Ralph Loop to be enabled/disabled globally and overridden per task.
+**Decision:** Reset `loopState.messages` with fresh iteration context when Ralph requests continuation.
 
 **Rationale:**
-- Flexibility for different types of tasks
-- User control over resource usage
-- Can disable for quick, simple tasks
-- Can enable for complex, multi-step tasks
+- Prevents token bloat
+- Provides clean slate for next iteration
+- Maintains learning via persisted summary/feedback files
+- Resets stream processor to avoid text accumulation issues
 
-## Usage Examples
+### 4. Structured Tool Result Capture
 
-### Basic Usage
+**Decision:** Capture structured tool results via `onToolResult` callback instead of parsing stringified output.
 
-1. Enable Ralph Loop via toggle in chat input
-2. Provide task: "Implement user authentication with tests"
-3. Agent will:
-   - Write code
-   - Run tests (fail)
-   - Fix bugs
-   - Run tests (pass)
-   - Output `<ralph>COMPLETE</ralph>`
-   - Stop
+**Rationale:**
+- More reliable than regex parsing
+- Preserves type information
+- Enables accurate stop criteria evaluation
+- Cleaner separation of concerns
 
-### Strict Mode Usage
+### 5. Persist Only on Successful Finish
 
-1. Configure stop criteria to require tests, lint, and tsc
-2. Provide task: "Add payment processing feature"
-3. Agent must:
-   - Implement feature
-   - Pass tests
-   - Pass lint
-   - Pass type check
-   - Output `<ralph>COMPLETE</ralph>`
+**Decision:** Write `ralph-summary.md` and `ralph-iteration.json` only on successful completion (no tool calls), not on errors.
 
-### Blocked Example
+**Rationale:**
+- Prevents corrupted state from error conditions
+- Aligns with completion hook semantics
+- Simplifies error recovery
+- Clearer artifact semantics
 
-1. Provide task: "Deploy to production"
-2. Agent encounters missing API key
-3. Agent outputs: `<ralph>BLOCKED: missing production API key</ralph>`
-4. Loop stops with reason: `blocked`
-5. User can provide key and resume
+## Migration Guide
+
+### From Old Architecture
+
+**Before:**
+```typescript
+// ExecutionService
+if (ralphLoopEnabled) {
+  await ralphLoopService.runLoop({...});  // Calls llmService.runAgentLoop internally
+} else {
+  await llmService.runAgentLoop({...});
+}
+```
+
+**After:**
+```typescript
+// ExecutionService
+await llmService.runAgentLoop({...});  // Ralph is a completion hook
+
+// App initialization (once)
+completionHookPipeline.register(stopHookService);
+completionHookPipeline.register(ralphLoopService);
+completionHookPipeline.register(autoCodeReviewService);
+```
 
 ## Performance Considerations
 
@@ -706,6 +872,7 @@ const taskSettings: TaskSettings = {
 - **Max Iterations:** Limits token usage (default: 6)
 - **Max Wall Time:** Prevents runaway execution (default: 1 hour)
 - **Fresh Context:** Reduces cost per iteration by avoiding accumulated messages
+- **No Duplicate Streaming:** Single message stream through LLMService
 
 ### Storage
 
@@ -744,6 +911,8 @@ const taskSettings: TaskSettings = {
 - **Commit:** `24261a4ac44e99c2abe17322bf86850858f70c2a`
 - **Main Implementation:** `src/services/agents/ralph-loop-service.ts`
 - **Type Definitions:** `src/types/ralph-loop.ts`
+- **Completion Hooks:** `src/types/completion-hooks.ts` (NEW)
+- **Hook Pipeline:** `src/services/agents/llm-completion-hooks.ts` (NEW)
 - **State Management:** `src/stores/ralph-loop-store.ts`
 - **Integration:** `src/services/execution-service.ts`
 - **UI:** `src/components/chat/chat-input.tsx`
@@ -751,4 +920,12 @@ const taskSettings: TaskSettings = {
 
 ## Summary
 
-Ralph Loop provides a robust, configurable framework for iterative AI task execution. By combining fresh context, persistent memory, and deterministic stop criteria, it enables AI agents to autonomously complete complex tasks with minimal human intervention. The implementation is well-tested, integrates seamlessly with TalkCody's architecture, and provides clear user controls for enabling and configuring the behavior.
+Ralph Loop provides a robust, configurable framework for iterative AI task execution. The redesigned architecture (stop-hook style) improves upon the original by:
+
+1. **Centralizing loop orchestration** in LLMService
+2. **Using a completion hook pipeline** for extensible post-execution logic
+3. **Eliminating nested loops** and duplicate streaming logic
+4. **Properly sequencing** stop hook → Ralph → auto review
+5. **Capturing structured tool results** for accurate evaluation
+
+This redesign makes the codebase clearer, more maintainable, and more extensible while preserving all existing functionality.

@@ -14,8 +14,11 @@
  */
 
 import { logger } from '@/lib/logger';
+import { autoCodeReviewHookService } from '@/services/agents/auto-code-review-hook-service';
+import { completionHookPipeline } from '@/services/agents/llm-completion-hooks';
 import { createLLMService, type LLMService } from '@/services/agents/llm-service';
 import { ralphLoopService } from '@/services/agents/ralph-loop-service';
+import { stopHookService } from '@/services/agents/stop-hook-service';
 import { messageService } from '@/services/message-service';
 import { notificationService } from '@/services/notification-service';
 import { taskService } from '@/services/task-service';
@@ -49,6 +52,30 @@ export interface ExecutionCallbacks {
 
 class ExecutionService {
   private llmServiceInstances = new Map<string, LLMService>();
+  private hooksRegistered = false;
+
+  /**
+   * Register completion hooks (called once during app initialization)
+   */
+  registerCompletionHooks(): void {
+    if (this.hooksRegistered) {
+      return;
+    }
+
+    // Register hooks in priority order:
+    // 10: Stop Hook (first)
+    // 20: Ralph Loop (second)
+    // 30: Auto Code Review (last)
+    completionHookPipeline.register(stopHookService);
+    completionHookPipeline.register(ralphLoopService);
+    completionHookPipeline.register(autoCodeReviewHookService);
+
+    logger.info('[ExecutionService] Registered completion hooks', {
+      hooks: completionHookPipeline.getRegisteredHooks(),
+    });
+
+    this.hooksRegistered = true;
+  }
 
   /**
    * Start execution for a task
@@ -143,156 +170,89 @@ class ExecutionService {
         callbacks?.onComplete?.({ success, fullText });
       };
 
-      // Check per-task Ralph Loop setting first, fallback to global setting
-      const taskSettings = useTaskStore.getState().getTask(taskId)?.settings;
-      let ralphLoopEnabled = false;
-      if (taskSettings) {
-        try {
-          const parsedSettings = JSON.parse(taskSettings) as { ralphLoopEnabled?: boolean };
-          ralphLoopEnabled =
-            typeof parsedSettings.ralphLoopEnabled === 'boolean'
-              ? parsedSettings.ralphLoopEnabled
-              : useSettingsStore.getState().getRalphLoopEnabled();
-        } catch {
-          ralphLoopEnabled = useSettingsStore.getState().getRalphLoopEnabled();
-        }
-      } else {
-        ralphLoopEnabled = useSettingsStore.getState().getRalphLoopEnabled();
-      }
-
-      if (ralphLoopEnabled) {
-        if (currentMessageId && streamedContent) {
-          await messageService.finalizeMessage(taskId, currentMessageId, streamedContent);
-          streamedContent = '';
-          currentMessageId = '';
-        }
-
-        // Create a message ID for Ralph loop responses
-        const ralphMessageId = messageService.createAssistantMessage(taskId, agentId);
-        currentMessageId = ralphMessageId;
-
-        const result = await ralphLoopService.runLoop({
-          taskId,
+      // Run agent loop with callbacks that route through services
+      // Completion hooks (stop hook, ralph loop, auto review) are handled internally by LLMService
+      await llmService.runAgentLoop(
+        {
           messages,
           model,
           systemPrompt,
           tools,
           agentId,
-          userMessage: config.userMessage,
-          llmService,
-          abortController,
-          onStatus: (status) => {
+        },
+        {
+          onAssistantMessageStart: () => {
+            if (abortController.signal.aborted) return;
+
+            // Skip if a message was just created but hasn't received content
+            if (currentMessageId && !streamedContent) {
+              logger.info('[ExecutionService] Skipping duplicate message start', { taskId });
+              return;
+            }
+
+            // Finalize previous message if any
+            if (currentMessageId && streamedContent) {
+              messageService
+                .finalizeMessage(taskId, currentMessageId, streamedContent)
+                .catch((err) => logger.error('Failed to finalize previous message:', err));
+            }
+
+            // Reset for new message
+            streamedContent = '';
+            currentMessageId = messageService.createAssistantMessage(taskId, agentId);
+          },
+
+          onChunk: (chunk: string) => {
+            if (abortController.signal.aborted) return;
+            streamedContent += chunk;
+            if (currentMessageId) {
+              messageService.updateStreamingContent(taskId, currentMessageId, streamedContent);
+            }
+          },
+
+          onComplete: async (fullText: string) => {
+            if (abortController.signal.aborted) return;
+
+            await handleCompletion(fullText);
+          },
+
+          onError: (error: Error) => {
+            if (abortController.signal.aborted) return;
+
+            logger.error('[ExecutionService] Agent loop error', error);
+            executionStore.setError(taskId, error.message);
+
+            // Clear running usage on error to avoid stale data
+            useTaskStore.getState().clearRunningTaskUsage(taskId);
+
+            callbacks?.onError?.(error);
+          },
+
+          onStatus: (status: string) => {
             if (abortController.signal.aborted) return;
             executionStore.setServerStatus(taskId, status);
           },
+
+          onToolMessage: async (uiMessage: UIMessage) => {
+            if (abortController.signal.aborted) return;
+
+            const toolMessage: UIMessage = {
+              ...uiMessage,
+              assistantId: uiMessage.assistantId || agentId,
+            };
+
+            await messageService.addToolMessage(taskId, toolMessage);
+          },
+
           onAttachment: async (attachment) => {
             if (abortController.signal.aborted) return;
-            await messageService.addAttachment(taskId, ralphMessageId, attachment);
+            if (currentMessageId) {
+              await messageService.addAttachment(taskId, currentMessageId, attachment);
+            }
           },
-        });
-
-        // Set streamedContent so finalizeExecution can persist the response
-        streamedContent = result.fullText;
-
-        // Handle failed Ralph loop runs
-        if (!result.success && !abortController.signal.aborted) {
-          // Finalize message with whatever content we have before erroring
-          if (currentMessageId && streamedContent) {
-            await messageService.finalizeMessage(taskId, currentMessageId, streamedContent);
-          }
-          // Clear running usage to avoid stale metrics
-          useTaskStore.getState().clearRunningTaskUsage(taskId);
-
-          executionStore.setError(taskId, 'Ralph loop failed');
-          callbacks?.onError?.(new Error('Ralph loop failed'));
-          return;
-        }
-
-        await handleCompletion(result.fullText, true);
-      } else {
-        // 4. Run agent loop with callbacks that route through services
-        await llmService.runAgentLoop(
-          {
-            messages,
-            model,
-            systemPrompt,
-            tools,
-            agentId,
-          },
-          {
-            onAssistantMessageStart: () => {
-              if (abortController.signal.aborted) return;
-
-              // Skip if a message was just created but hasn't received content
-              if (currentMessageId && !streamedContent) {
-                logger.info('[ExecutionService] Skipping duplicate message start', { taskId });
-                return;
-              }
-
-              // Finalize previous message if any
-              if (currentMessageId && streamedContent) {
-                messageService
-                  .finalizeMessage(taskId, currentMessageId, streamedContent)
-                  .catch((err) => logger.error('Failed to finalize previous message:', err));
-              }
-
-              // Reset for new message
-              streamedContent = '';
-              currentMessageId = messageService.createAssistantMessage(taskId, agentId);
-            },
-
-            onChunk: (chunk: string) => {
-              if (abortController.signal.aborted) return;
-              streamedContent += chunk;
-              if (currentMessageId) {
-                messageService.updateStreamingContent(taskId, currentMessageId, streamedContent);
-              }
-            },
-
-            onComplete: async (fullText: string) => {
-              if (abortController.signal.aborted) return;
-
-              await handleCompletion(fullText);
-            },
-
-            onError: (error: Error) => {
-              if (abortController.signal.aborted) return;
-
-              logger.error('[ExecutionService] Agent loop error', error);
-              executionStore.setError(taskId, error.message);
-
-              // Clear running usage on error to avoid stale data
-              useTaskStore.getState().clearRunningTaskUsage(taskId);
-
-              callbacks?.onError?.(error);
-            },
-
-            onStatus: (status: string) => {
-              if (abortController.signal.aborted) return;
-              executionStore.setServerStatus(taskId, status);
-            },
-
-            onToolMessage: async (uiMessage: UIMessage) => {
-              if (abortController.signal.aborted) return;
-
-              const toolMessage: UIMessage = {
-                ...uiMessage,
-                assistantId: uiMessage.assistantId || agentId,
-              };
-
-              await messageService.addToolMessage(taskId, toolMessage);
-            },
-
-            onAttachment: async (attachment) => {
-              if (abortController.signal.aborted) return;
-              if (currentMessageId) {
-                await messageService.addAttachment(taskId, currentMessageId, attachment);
-              }
-            },
-          },
-          abortController
-        );
-      }
+        },
+        abortController
+      );
     } catch (error) {
       if (!abortController.signal.aborted) {
         const execError = error instanceof Error ? error : new Error(String(error));

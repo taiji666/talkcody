@@ -457,11 +457,7 @@ pub(crate) fn parse_openai_oauth_event_legacy(
             if let Some(item) = payload.get("item") {
                 match item.get("type").and_then(|v| v.as_str()) {
                     Some("function_call") => {
-                        // Emit TextStart when tool call starts to ensure assistant message is created
-                        if !state.text_started {
-                            state.text_started = true;
-                            state.pending_events.push(StreamEvent::TextStart);
-                        }
+                        // Avoid TextStart here so tool messages stay ordered before the next assistant reply.
 
                         let item_id = item
                             .get("id")

@@ -91,7 +91,6 @@ describe('CustomModelService - Provider Endpoints Configuration', () => {
       'google',
       'moonshot',
       'github_copilot',
-      'qwen_code',
       'ollama',
       'lmstudio',
     ];

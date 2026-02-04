@@ -47,7 +47,6 @@ export const PROVIDER_ICONS: Record<string, ComponentType<IconProps>> = {
   MiniMax: createImageIcon('/icons/providers/minimax.svg', 'Minimax'),
   openRouter: createImageIcon('/icons/providers/openrouter.svg', 'OpenRouter'),
   tavily: createImageIcon('/icons/providers/tavily.svg', 'Tavily'),
-  qwen_code: createImageIcon('/icons/providers/qwen.svg', 'Qwen Code'),
   serper: createImageIcon('/icons/providers/serpser.jpeg', 'Serper'),
   zhipu: createImageIcon('/icons/providers/zhipu.png', 'Zhipu AI'),
   github_copilot: createImageIcon('/icons/providers/github-copilot.svg', 'GitHub Copilot', true),

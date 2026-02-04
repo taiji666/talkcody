@@ -99,15 +99,11 @@ class FileUploadService {
    * Extract filename from path (handles both Unix and Windows paths)
    */
   private extractFilename(filePath: string): string {
-    // Try Unix path separator first
-    const unixParts = filePath.split('/');
-    const unixFilename = unixParts[unixParts.length - 1];
+    const normalizedPath = filePath.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (!normalizedPath) return 'unknown';
 
-    // If no Unix separator, try Windows
-    if (unixParts.length === 1) {
-      const windowsParts = filePath.split('\\');
-      return windowsParts[windowsParts.length - 1] || 'unknown';
-    }
+    const unixParts = normalizedPath.split('/');
+    const unixFilename = unixParts[unixParts.length - 1];
 
     return unixFilename || 'unknown';
   }
@@ -268,7 +264,7 @@ class FileUploadService {
   async uploadFromFileData(
     fileData: Uint8Array,
     mimeType: string,
-    _originalFileName: string
+    originalFileName: string
   ): Promise<MessageAttachment | null> {
     try {
       logger.info('📁 uploadFromFileData - Starting, size:', fileData.length, 'type:', mimeType);
@@ -277,12 +273,16 @@ class FileUploadService {
       const base64Data = fileService.uint8ArrayToBase64Public(fileData);
 
       // Save to attachments directory for persistence
-      const { filePath, filename } = await fileService.saveClipboardImage(fileData, mimeType);
+      const { filePath, filename: storedName } = await fileService.saveClipboardImage(
+        fileData,
+        mimeType
+      );
+      const displayName = originalFileName || storedName;
 
       const attachment: MessageAttachment = {
         id: generateId(),
         type: 'image',
-        filename,
+        filename: displayName,
         content: base64Data,
         filePath,
         mimeType,

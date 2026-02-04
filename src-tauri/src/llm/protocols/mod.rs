@@ -13,6 +13,7 @@ pub use stream_parser::ProtocolStreamParser;
 
 /// Legacy protocol trait - kept for backward compatibility during migration
 /// New code should use the modular traits: ProtocolRequestBuilder, ProtocolStreamParser, ProtocolHeaderBuilder
+#[allow(dead_code)]
 pub trait LlmProtocol: Send + Sync {
     // Note: This trait no longer requires ProtocolRequestBuilder, ProtocolStreamParser, ProtocolHeaderBuilder
     // to maintain backward compatibility with existing implementations (ClaudeProtocol, OpenAiProtocol).

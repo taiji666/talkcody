@@ -5,8 +5,7 @@
 use crate::llm::auth::api_key_manager::ApiKeyManager;
 use crate::llm::protocols::{
     claude_protocol::ClaudeProtocol, header_builder::HeaderBuildContext,
-    openai_protocol::OpenAiProtocol, request_builder::ProtocolRequestBuilder,
-    stream_parser::ProtocolStreamParser,
+    openai_protocol::OpenAiProtocol,
 };
 use crate::llm::providers::provider::{
     BaseProvider, Provider, ProviderContext, ProviderCredentials as Creds,
@@ -81,19 +80,66 @@ impl ProtocolImpl for ClaudeProtocolWrapper {
     }
     fn build_request(
         &self,
-        _ctx: crate::llm::protocols::request_builder::RequestBuildContext,
+        ctx: crate::llm::protocols::request_builder::RequestBuildContext,
     ) -> Result<Value, String> {
-        // ClaudeProtocol implements LlmProtocol which has different signatures
-        // For now, return empty object - this should be implemented properly
-        Ok(serde_json::json!({}))
+        use crate::llm::protocols::LlmProtocol;
+
+        self.0.build_request(
+            ctx.model,
+            ctx.messages,
+            ctx.tools,
+            ctx.temperature,
+            ctx.max_tokens,
+            ctx.top_p,
+            ctx.top_k,
+            ctx.provider_options,
+            ctx.extra_body,
+        )
     }
     fn parse_stream_event(
         &self,
-        _ctx: crate::llm::protocols::stream_parser::StreamParseContext,
-        _state: &mut crate::llm::protocols::stream_parser::StreamParseState,
+        ctx: crate::llm::protocols::stream_parser::StreamParseContext,
+        state: &mut crate::llm::protocols::stream_parser::StreamParseState,
     ) -> Result<Option<crate::llm::types::StreamEvent>, String> {
-        // ClaudeProtocol implements LlmProtocol which has different signatures
-        Ok(None)
+        use crate::llm::protocols::{LlmProtocol, ProtocolStreamState};
+
+        let mut legacy = ProtocolStreamState {
+            finish_reason: state.finish_reason.clone(),
+            tool_calls: std::mem::take(&mut state.tool_calls),
+            tool_call_order: std::mem::take(&mut state.tool_call_order),
+            emitted_tool_calls: std::mem::take(&mut state.emitted_tool_calls),
+            tool_call_index_map: std::mem::take(&mut state.tool_call_index_map),
+            current_thinking_id: state.current_thinking_id.clone(),
+            pending_events: std::mem::take(&mut state.pending_events),
+            text_started: state.text_started,
+            content_block_types: std::mem::take(&mut state.content_block_types),
+            content_block_ids: std::mem::take(&mut state.content_block_ids),
+            reasoning_started: state.reasoning_started,
+            reasoning_id: state.reasoning_id.clone(),
+            openai_reasoning: std::mem::take(&mut state.openai_reasoning),
+            openai_store: state.openai_store,
+        };
+
+        let result = self
+            .0
+            .parse_stream_event(ctx.event_type, ctx.data, &mut legacy);
+
+        state.finish_reason = legacy.finish_reason;
+        state.tool_calls = legacy.tool_calls;
+        state.tool_call_order = legacy.tool_call_order;
+        state.emitted_tool_calls = legacy.emitted_tool_calls;
+        state.tool_call_index_map = legacy.tool_call_index_map;
+        state.current_thinking_id = legacy.current_thinking_id;
+        state.pending_events = legacy.pending_events;
+        state.text_started = legacy.text_started;
+        state.content_block_types = legacy.content_block_types;
+        state.content_block_ids = legacy.content_block_ids;
+        state.reasoning_started = legacy.reasoning_started;
+        state.reasoning_id = legacy.reasoning_id;
+        state.openai_reasoning = legacy.openai_reasoning;
+        state.openai_store = legacy.openai_store;
+
+        result
     }
 }
 

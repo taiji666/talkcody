@@ -260,6 +260,17 @@ describe('ProjectService with Real Database', () => {
       expect(project?.id).toBe(projectId);
     });
 
+    it('should find project with legacy unnormalized root path', async () => {
+      const legacyPath = 'C:\\Users\\dev\\legacy-repo\\';
+      db.rawExecute(
+        'INSERT INTO projects (id, name, description, created_at, updated_at, context, rules, root_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ['legacy-1', 'Legacy', '', Date.now(), Date.now(), '', '', legacyPath]
+      );
+
+      const project = await projectService.getProjectByRootPath('C:/Users/dev/legacy-repo');
+      expect(project?.id).toBe('legacy-1');
+    });
+
     it('should return null for non-existent root path', async () => {
       const project = await projectService.getProjectByRootPath('/non/existent');
       expect(project).toBeNull();
@@ -268,24 +279,56 @@ describe('ProjectService with Real Database', () => {
 
   describe('createOrGetProjectForRepository', () => {
     it('should return existing project if root path matches', async () => {
-      const rootPath = '/existing/repo';
-      const projectId = await projectService.createProject({ name: 'Existing', root_path: rootPath });
+      const rootPath = '/existing/repo/';
+      const projectId = await projectService.createProject({
+        name: 'Existing',
+        root_path: '/existing/repo',
+      });
 
       const project = await projectService.createOrGetProjectForRepository(rootPath);
       expect(project.id).toBe(projectId);
     });
 
-    it('should create new project if root path does not exist', async () => {
-      const rootPath = '/new/repo';
+    it('should normalize and store root_path without trailing separator', async () => {
+      const rootPath = '/new/repo/';
       const project = await projectService.createOrGetProjectForRepository(rootPath);
 
-      expect(project.root_path).toBe(rootPath);
+      expect(project.root_path).toBe('/new/repo');
       expect(project.name).toBe('repo');
     });
 
     it('should extract repo name from path', async () => {
       const project = await projectService.createOrGetProjectForRepository('/a/b/my-repo');
       expect(project.name).toBe('my-repo');
+    });
+
+    it('should extract repo name from Windows-style path', async () => {
+      const rootPath = 'C:\\Users\\dev\\my-repo';
+      const project = await projectService.createOrGetProjectForRepository(rootPath);
+
+      expect(project.root_path).toBe('C:/Users/dev/my-repo');
+      expect(project.name).toBe('my-repo');
+    });
+
+    it('should extract repo name from mixed separators', async () => {
+      const rootPath = 'C:/Users/dev\\mixed-repo';
+      const project = await projectService.createOrGetProjectForRepository(rootPath);
+
+      expect(project.root_path).toBe('C:/Users/dev/mixed-repo');
+      expect(project.name).toBe('mixed-repo');
+    });
+
+    it('should handle trailing separators', async () => {
+      const windowsRoot = 'C:\\Users\\dev\\trail-repo\\';
+      const unixRoot = '/Users/dev/trail-repo/';
+
+      const windowsProject = await projectService.createOrGetProjectForRepository(windowsRoot);
+      const unixProject = await projectService.createOrGetProjectForRepository(unixRoot);
+
+      expect(windowsProject.root_path).toBe('C:/Users/dev/trail-repo');
+      expect(unixProject.root_path).toBe('/Users/dev/trail-repo');
+      expect(windowsProject.name).toBe('trail-repo');
+      expect(unixProject.name).toBe('trail-repo');
     });
   });
 

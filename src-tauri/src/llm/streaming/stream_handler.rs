@@ -1,6 +1,5 @@
 use crate::llm::auth::api_key_manager::ApiKeyManager;
 use crate::llm::protocols::stream_parser::StreamParseState;
-use crate::llm::protocols::ProtocolStreamState;
 use crate::llm::providers::provider::ProviderContext;
 use crate::llm::providers::provider_registry::ProviderRegistry;
 use crate::llm::testing::fixtures::FixtureInput;
@@ -217,11 +216,10 @@ impl StreamHandler {
             built_request.url.contains("/codex/responses"),
             test_config.base_url_override.as_deref(),
         );
-        let endpoint_path = if let Some((_, path)) = built_request.url.rsplit_once('/') {
-            path
-        } else {
-            ""
-        };
+        let endpoint_path = reqwest::Url::parse(&built_request.url)
+            .ok()
+            .map(|url| url.path().trim_start_matches('/').to_string())
+            .unwrap_or_default();
         let url = if test_config.mode != TestMode::Off {
             if let Some(override_url) = test_config.base_url_override.as_deref() {
                 format!("{}/{}", override_url.trim_end_matches('/'), endpoint_path)
@@ -391,7 +389,7 @@ impl StreamHandler {
         let mut state = StreamParseState::default();
         let mut chunk_count = 0;
         let mut response_text = String::new();
-        let stream_timeout = Duration::from_secs(60); // Timeout between chunks
+        let stream_timeout = Duration::from_secs(300); // Timeout between chunks
 
         log::info!("[LLM Stream {}] Starting to read stream...", request_id);
 
@@ -828,7 +826,7 @@ impl StreamHandler {
         &self,
         window: &tauri::Window,
         event_name: &str,
-        request_id: &str,
+        _request_id: &str,
         event: &StreamEvent,
     ) {
         // log::info!("[LLM Stream {}] Emitting event: {:?}", request_id, event);
@@ -922,7 +920,7 @@ mod tests {
         let db_path = dir.path().join("talkcody-test.db");
         let db = Arc::new(Database::new(db_path.to_string_lossy().to_string()));
         db.connect().await.expect("db connect");
-        let api_keys = ApiKeyManager::new(db, std::path::PathBuf::from("/tmp"));
+        let _api_keys = ApiKeyManager::new(db, std::path::PathBuf::from("/tmp"));
         let provider = OpenAiProvider::new(ProviderConfig {
             id: "openai".to_string(),
             name: "OpenAI".to_string(),
@@ -1443,7 +1441,7 @@ mod tests {
         let db_path = dir.path().join("talkcody-test.db");
         let db = Arc::new(Database::new(db_path.to_string_lossy().to_string()));
         db.connect().await.expect("db connect");
-        let api_keys = ApiKeyManager::new(db, std::path::PathBuf::from("/tmp"));
+        let _api_keys = ApiKeyManager::new(db, std::path::PathBuf::from("/tmp"));
         let provider = OpenAiProvider::new(ProviderConfig {
             id: "openai".to_string(),
             name: "OpenAI".to_string(),
@@ -1609,9 +1607,9 @@ mod tests {
     // ============================================================================
 
     #[test]
-    fn openai_oauth_emits_text_start_on_tool_call() {
-        // Test that TextStart is emitted when a tool call starts
-        // This ensures the assistant message is created before tool calls
+    fn openai_oauth_does_not_emit_text_start_on_tool_call() {
+        // Tool calls should not create an assistant message before tool results
+        // to keep tool messages before the assistant reply in the UI.
         let mut state = ProtocolStreamState::default();
         let payload = json!({
             "type": "response.output_item.added",
@@ -1625,17 +1623,11 @@ mod tests {
         });
 
         let event = parse_openai_oauth_event_legacy(None, &payload.to_string(), &mut state)
-            .expect("parse event")
-            .expect("event");
+            .expect("parse event");
 
-        // Should emit TextStart first when tool call starts
-        match event {
-            StreamEvent::TextStart => {
-                // Expected - TextStart ensures assistant message is created
-            }
-            _ => panic!("Expected TextStart when tool call starts, got {:?}", event),
-        }
-        assert!(state.text_started);
+        assert!(event.is_none());
+        assert!(!state.text_started);
+        assert!(state.pending_events.is_empty());
     }
 
     #[test]

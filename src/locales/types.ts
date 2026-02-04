@@ -380,27 +380,6 @@ export interface LocaleDefinition {
         checkboxLabel: string;
       };
     };
-    qwenOAuth: {
-      title: string;
-      description: string;
-      tokenPathLabel: string;
-      pathPlaceholder: string;
-      browseTitle: string;
-      testConnection: string;
-      testing: string;
-      connected: string;
-      disconnect: string;
-      disconnected: string;
-      pathRequired: string;
-      fileNotFound: string;
-      invalidToken: string;
-      testFailed: string;
-      disconnectFailed: string;
-      helpText: string;
-      tokenPath: string;
-      useDefault: string;
-      defaultLocation: string;
-    };
     githubCopilotOAuth: {
       title: string;
       description: string;

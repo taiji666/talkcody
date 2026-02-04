@@ -37,6 +37,7 @@ import { messageService } from '@/services/message-service';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
+import type { ToolSummary } from '@/types/completion-hooks';
 import { ModelType } from '@/types/model-types';
 import type {
   AgentLoopOptions,
@@ -46,6 +47,7 @@ import type {
   UIMessage,
 } from '../../types/agent';
 import { aiPricingService } from '../ai/ai-pricing-service';
+import { completionHookPipeline } from './llm-completion-hooks';
 
 /**
  * Callbacks for agent loop
@@ -83,6 +85,8 @@ export class LLMService {
   private readonly taskId: string;
   /** File name for compacted messages storage */
   private static readonly COMPACTED_MESSAGES_FILE = 'compacted-messages.json';
+  /** Tool summaries collected during iteration for completion hooks */
+  private toolSummaries: ToolSummary[] = [];
 
   private getDefaultCompressionConfig(): CompressionConfig {
     return {
@@ -122,6 +126,34 @@ export class LLMService {
   /** Get the task ID for this instance */
   getTaskId(): string | undefined {
     return this.taskId;
+  }
+
+  /**
+   * Capture tool result for completion hook evaluation
+   */
+  private captureToolResult(toolName: string, result: unknown, toolCallId: string): void {
+    const summary: ToolSummary = {
+      toolName,
+      toolCallId,
+    };
+
+    // Extract structured data from bash tool results
+    if (toolName === 'bash' && result && typeof result === 'object') {
+      const bashResult = result as {
+        command?: string;
+        success?: boolean;
+        output?: string;
+        error?: string;
+      };
+      summary.command = bashResult.command;
+      summary.success = bashResult.success;
+      summary.output = bashResult.output;
+      summary.error = bashResult.error;
+    } else if (result && typeof result === 'object' && 'error' in result) {
+      summary.error = String((result as { error?: string }).error);
+    }
+
+    this.toolSummaries.push(summary);
   }
 
   /**
@@ -514,6 +546,7 @@ export class LLMService {
 
         let didRunSessionStart = false;
         let autoCompactionAttempts = 0;
+        let ralphIteration = 0; // Track Ralph loop iterations separately from agent steps
 
         while (!loopState.isComplete && loopState.currentIteration < maxIterations) {
           if (this.taskId && !isSubagent && !didRunSessionStart) {
@@ -541,6 +574,10 @@ export class LLMService {
           }
 
           loopState.currentIteration++;
+
+          // Reset tool summaries at the start of each iteration to ensure
+          // completion hooks only see results from the current iteration
+          this.toolSummaries = [];
 
           const filteredTools = { ...tools };
           onStatus?.(t.LLMService.status.step(loopState.currentIteration));
@@ -1033,37 +1070,87 @@ export class LLMService {
             throw new Error(t.LLMService.errors.unknownFinishReason);
           }
 
-          const shouldRunStopHook =
+          if (abortController?.signal.aborted) {
+            rejectOnAbort('Agent loop aborted before completion hooks');
+            return;
+          }
+
+          // Run completion hook pipeline on successful finish (no tool calls)
+          const shouldRunCompletionHooks =
             this.taskId &&
             toolCalls.length === 0 &&
             !isSubagent &&
             (!agentId || agentId === 'planner');
 
-          if (shouldRunStopHook) {
-            const stopSummary = await hookService.runStop(this.taskId);
-            hookService.applyHookSummary(stopSummary);
+          if (shouldRunCompletionHooks) {
+            const fullText = streamProcessor.getFullText();
 
-            if (stopSummary.blocked) {
-              const reason = stopSummary.blockReason || stopSummary.stopReason;
-              if (reason) {
-                await messageService.addUserMessage(this.taskId, reason);
-                loopState.messages.push({
-                  role: 'user',
-                  content: reason,
-                });
-              }
-              hookStateService.setStopHookActive(true);
+            // Increment Ralph iteration counter (separate from agent step counter)
+            ralphIteration++;
+
+            // Build completion context
+            const completionContext = {
+              taskId: this.taskId,
+              fullText,
+              toolSummaries: this.toolSummaries,
+              loopState,
+              iteration: ralphIteration,
+              startTime: totalStartTime,
+              userMessage: inputMessages.find((m) => m.role === 'user')?.content as
+                | string
+                | undefined,
+              systemPrompt,
+            };
+
+            // Run completion hook pipeline
+            const result = await completionHookPipeline.run(completionContext);
+
+            if (result.action === 'continue' && result.nextMessages) {
+              // Hook wants to continue with fresh context (e.g., Ralph Loop)
+              logger.info('[LLMService] Completion hook requested continuation', {
+                taskId: this.taskId,
+                iteration: loopState.currentIteration,
+              });
+
+              // 1. Convert next messages to model format
+              const newModelMessages = await convertMessages(result.nextMessages, {
+                rootPath,
+                systemPrompt,
+                model,
+                providerId: providerId ?? undefined,
+              });
+
+              // 2. Reset loopState.messages with fresh context
+              loopState.messages = convertToAnthropicFormat(newModelMessages, {
+                autoFix: true,
+                trimAssistantWhitespace: true,
+              });
+
+              // 3. Reset other loopState fields for fresh iteration
+              loopState.lastRequestTokens = 0;
+              loopState.unknownFinishReasonCount = 0;
+              loopState.lastFinishReason = undefined;
+              loopState.isComplete = false;
+
+              // 4. Reset tool summaries for next iteration
+              this.toolSummaries = [];
+
+              // 5. Reset stream processor for fresh iteration
+              streamProcessor.fullReset();
+
+              // 6. Continue the loop
               continue;
-            } else {
-              const reviewText = await autoCodeReviewService.run(this.taskId);
-              if (reviewText) {
-                await messageService.addUserMessage(this.taskId, reviewText);
-                loopState.messages.push({
-                  role: 'user',
-                  content: reviewText,
-                });
-                continue;
-              }
+            }
+
+            if (result.action === 'stop') {
+              // Hook requested stop
+              logger.info('[LLMService] Completion hook requested stop', {
+                taskId: this.taskId,
+                stopReason: result.stopReason,
+                stopMessage: result.stopMessage,
+              });
+
+              // Continue to final completion
             }
           }
 
@@ -1083,10 +1170,15 @@ export class LLMService {
               taskId: this.taskId,
             };
 
+            // Execute tools with result capture callback
             const results = await this.toolExecutor.executeWithSmartConcurrency(
               toolCalls,
               toolExecutionOptions,
-              onStatus
+              onStatus,
+              // Capture tool results for completion hooks
+              (toolName, result, toolCallId) => {
+                this.captureToolResult(toolName, result, toolCallId);
+              }
             );
 
             // Build combined assistant message with text/reasoning AND tool calls

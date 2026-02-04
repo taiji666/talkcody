@@ -202,7 +202,7 @@ export class LlmClient {
   async completeOpenAIOAuth(params: {
     code: string;
     verifier: string;
-    expectedState?: string;
+    expectedState: string;
     redirectUri?: string;
   }): Promise<{
     accessToken: string;
@@ -210,6 +210,9 @@ export class LlmClient {
     expiresAt: number;
     accountId?: string;
   }> {
+    if (!params.expectedState) {
+      throw new Error('Missing expectedState for OpenAI OAuth');
+    }
     return invoke('llm_openai_oauth_complete', { request: params });
   }
 
@@ -229,36 +232,6 @@ export class LlmClient {
     accountId?: string;
   }> {
     return invoke('llm_openai_oauth_refresh_from_store');
-  }
-
-  async readQwenCredentials(params: { path: string }): Promise<{
-    access_token: string;
-    refresh_token: string;
-    token_type: string;
-    resource_url: string;
-    expiry_date: number;
-  }> {
-    return invoke('llm_qwen_read_credentials', params);
-  }
-
-  async readQwenToken(params: { path: string }): Promise<string> {
-    return invoke('llm_qwen_read_token', params);
-  }
-
-  async validateQwenTokenPath(params: { path: string }): Promise<boolean> {
-    return invoke('llm_qwen_validate_token_path', params);
-  }
-
-  async testQwenToken(params: { token: string }): Promise<boolean> {
-    return invoke('llm_qwen_test_token', params);
-  }
-
-  async setQwenTokenPath(params: { path: string }): Promise<void> {
-    await invoke('llm_qwen_set_token_path', params);
-  }
-
-  async clearQwenTokenPath(): Promise<void> {
-    await invoke('llm_qwen_clear_token_path');
   }
 
   async disconnectClaudeOAuth(): Promise<void> {
@@ -327,9 +300,6 @@ export class LlmClient {
       accountId?: string | null;
       isConnected?: boolean | null;
       hasRefreshToken?: boolean | null;
-    } | null;
-    qwen?: {
-      isConnected?: boolean | null;
     } | null;
     githubCopilot?: {
       isConnected?: boolean | null;

@@ -1,5 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
+import { act } from 'react';
 import type React from 'react';
+import type { FileNode } from '@/types/file-system';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 import { RepositoryStoreProvider, useRepositoryStore } from './window-scoped-repository-store';
@@ -39,6 +41,7 @@ vi.mock('@/services/repository-service', () => ({
     writeFile: vi.fn(),
     invalidateCache: vi.fn(),
     getFileNameFromPath: vi.fn((path: string) => path.split('/').pop()),
+    renameFile: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -124,6 +127,101 @@ describe('window-scoped-repository-store - selectRepository UI freeze bug', () =
     expect(databaseService.createOrGetProjectForRepository).toHaveBeenCalledWith('/test/new-project');
   });
 
+
+  it('should ignore stale openRepository completions', async () => {
+    const { repositoryService } = await import('@/services/repository-service');
+
+    const firstTreePromise = new Promise<FileNode>((resolve) => {
+      setTimeout(() => {
+        resolve({ path: '/test/first', name: 'first', is_directory: true, children: [] });
+      }, 30);
+    });
+
+    const secondTreePromise = new Promise<FileNode>((resolve) => {
+      setTimeout(() => {
+        resolve({ path: '/test/second', name: 'second', is_directory: true, children: [] });
+      }, 10);
+    });
+
+    vi.mocked(repositoryService.buildDirectoryTree)
+      .mockImplementationOnce(() => firstTreePromise)
+      .mockImplementationOnce(() => secondTreePromise);
+
+    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
+
+    result.current.openRepository('/test/first', 'proj-1');
+    result.current.openRepository('/test/second', 'proj-2');
+
+    await waitFor(() => expect(result.current.rootPath).toBe('/test/second'), { timeout: 200 });
+  });
+
+
+
+  it('should reset loading state when repository selection fails', async () => {
+    const { repositoryService } = await import('@/services/repository-service');
+
+    vi.mocked(repositoryService.selectRepositoryFolder).mockRejectedValue(new Error('boom'));
+
+    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
+
+    const project = await result.current.selectRepository();
+
+    expect(project).toBeNull();
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.error).toBe('boom');
+  });
+
+
+  it('should apply content to the correct file when reads resolve out of order', async () => {
+    const { repositoryService } = await import('@/services/repository-service');
+
+    const firstRead = new Promise<string>((resolve) => {
+      setTimeout(() => resolve('content-a'), 30);
+    });
+    const secondRead = new Promise<string>((resolve) => {
+      setTimeout(() => resolve('content-b'), 10);
+    });
+
+    vi.mocked(repositoryService.readFileWithCache)
+      .mockImplementationOnce(() => firstRead)
+      .mockImplementationOnce(() => secondRead);
+
+    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
+
+    await act(async () => {
+      result.current.selectFile('/test/path/a.ts');
+      result.current.selectFile('/test/path/b.ts');
+    });
+
+    await waitFor(() => {
+      const fileA = result.current.openFiles.find((f) => f.path === '/test/path/a.ts');
+      const fileB = result.current.openFiles.find((f) => f.path === '/test/path/b.ts');
+      expect(fileA?.content).toBe('content-a');
+      expect(fileB?.content).toBe('content-b');
+    });
+  });
+
+  it('should set error on the correct file when read fails', async () => {
+    const { repositoryService } = await import('@/services/repository-service');
+
+    vi.mocked(repositoryService.readFileWithCache).mockImplementationOnce(() => {
+      return Promise.reject(new Error('read failed'));
+    });
+
+    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
+
+    await act(async () => {
+      result.current.selectFile('/test/path/err.ts');
+    });
+
+    await waitFor(() => {
+      const fileErr = result.current.openFiles.find((f) => f.path === '/test/path/err.ts');
+      expect(fileErr?.error).toBe('read failed');
+      expect(fileErr?.isLoading).toBe(false);
+    });
+  });
+
+
   it('should run openRepository in background without blocking', async () => {
     const { repositoryService } = await import('@/services/repository-service');
 
@@ -157,40 +255,7 @@ describe('window-scoped-repository-store - selectRepository UI freeze bug', () =
     });
   });
 
-  it('should handle multiple rapid selectRepository calls correctly', async () => {
-    const { repositoryService } = await import('@/services/repository-service');
 
-    // First call - slow response
-    vi.mocked(repositoryService.selectRepositoryFolder).mockResolvedValueOnce('/test/first-project');
-    vi.mocked(repositoryService.buildDirectoryTree).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({
-              path: '/test/first-project',
-              name: 'first-project',
-              is_directory: true,
-              children: [],
-            });
-          }, 500);
-        })
-    );
-
-    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
-
-    // Start first selection
-    result.current.selectRepository();
-
-    // Immediately try to select another repository
-    vi.mocked(repositoryService.selectRepositoryFolder).mockResolvedValueOnce('/test/second-project');
-    result.current.selectRepository();
-
-    // Wait for completion
-    await waitFor(() => expect(result.current.rootPath).toBe('/test/second-project'), { timeout: 1000 });
-
-    // Should have selected the second project (not first)
-    expect(result.current.rootPath).toBe('/test/second-project');
-  });
 
   it('should not rebuild directory tree for same path', async () => {
     const { repositoryService } = await import('@/services/repository-service');
@@ -212,6 +277,72 @@ describe('window-scoped-repository-store - selectRepository UI freeze bug', () =
 
     // buildDirectoryTree should not be called again
     expect(repositoryService.buildDirectoryTree).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('window-scoped-repository-store - rename path updates', () => {
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <RepositoryStoreProvider>{children}</RepositoryStoreProvider>
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should update open file path for Windows-style separators', async () => {
+    const { repositoryService } = await import('@/services/repository-service');
+
+    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
+
+    const rootPath = 'C:\\Repo';
+    const oldPath = 'C:\\Repo\\src\\old.ts';
+
+    vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('content');
+
+    await result.current.openRepository(rootPath, 'proj-1');
+
+    await waitFor(() => {
+      expect(result.current.rootPath).toBe(rootPath);
+    });
+
+    await result.current.selectFile(oldPath);
+
+    await result.current.renameFile(oldPath, 'new.ts');
+
+    expect(repositoryService.renameFile).toHaveBeenCalledWith(oldPath, 'new.ts');
+    expect(result.current.openFiles[0]?.path).toBe('C:\\Repo\\src\\new.ts');
+  });
+
+  it('should update open files within renamed directory', async () => {
+    const { repositoryService } = await import('@/services/repository-service');
+
+    const { result } = renderHook(() => useRepositoryStore((state) => state), { wrapper });
+
+    const rootPath = '/repo';
+    const oldDir = '/repo/src';
+    const fileA = '/repo/src/a.ts';
+    const fileB = '/repo/src/sub/b.ts';
+
+    vi.mocked(repositoryService.readFileWithCache).mockResolvedValue('content');
+
+    await result.current.openRepository(rootPath, 'proj-1');
+
+    await waitFor(() => {
+      expect(result.current.rootPath).toBe(rootPath);
+    });
+
+    await act(async () => {
+      await result.current.selectFile(fileA);
+      await result.current.selectFile(fileB);
+    });
+
+    await result.current.renameFile(oldDir, 'lib');
+
+    expect(repositoryService.renameFile).toHaveBeenCalledWith(oldDir, 'lib');
+    const paths = result.current.openFiles.map((f) => f.path);
+    expect(paths).toContain('/repo/lib/a.ts');
+    expect(paths).toContain('/repo/lib/sub/b.ts');
   });
 });
 

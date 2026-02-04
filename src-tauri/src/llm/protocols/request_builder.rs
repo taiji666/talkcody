@@ -26,6 +26,7 @@ pub trait ProtocolRequestBuilder: Send + Sync {
 
 /// Trait for building protocol-specific messages
 /// Handles conversion of internal Message types to protocol-specific format
+#[allow(dead_code)]
 pub trait ProtocolMessageConverter: Send + Sync {
     /// Convert a single message to the protocol format
     fn convert_message(&self, message: &Message) -> Value;

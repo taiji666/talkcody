@@ -15,7 +15,6 @@ export interface OAuthConfig {
   anthropicIsConnected?: boolean | null;
   openaiIsConnected?: boolean | null;
   openaiAccountId?: string | null;
-  qwenIsConnected?: boolean | null;
   githubCopilotIsConnected?: boolean | null;
 }
 

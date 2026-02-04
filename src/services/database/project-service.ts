@@ -5,6 +5,34 @@ import { generateId } from '@/lib/utils';
 import type { CreateProjectData, Project, UpdateProjectData } from '@/types';
 import type { TursoClient } from './turso-client';
 
+const WINDOWS_ROOT_REGEX = /^[A-Za-z]:\/$/;
+
+function normalizeRootPath(rootPath: string): string {
+  const normalized = rootPath.replace(/\\/g, '/');
+  if (normalized === '/' || WINDOWS_ROOT_REGEX.test(normalized)) {
+    return normalized;
+  }
+  return normalized.replace(/\/+$/, '');
+}
+
+function buildRootPathLookupValues(rootPath: string): string[] {
+  const normalized = normalizeRootPath(rootPath);
+  const raw = rootPath;
+
+  const rawNormalized = raw.replace(/\\/g, '/');
+  const trimmedRaw = rawNormalized.replace(/\/+$/, '');
+
+  const values = new Set<string>();
+  values.add(normalized);
+  values.add(raw);
+  values.add(rawNormalized);
+  if (trimmedRaw) {
+    values.add(trimmedRaw);
+  }
+
+  return Array.from(values);
+}
+
 export class ProjectService {
   constructor(private db: TursoClient) {}
 
@@ -12,6 +40,7 @@ export class ProjectService {
   async createProject(data: CreateProjectData): Promise<string> {
     const projectId = generateId();
     const now = Date.now();
+    const normalizedRootPath = data.root_path ? normalizeRootPath(data.root_path) : null;
 
     await this.db.execute(
       'INSERT INTO projects (id, name, description, created_at, updated_at, context, rules, root_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
@@ -23,7 +52,7 @@ export class ProjectService {
         now,
         data.context || '',
         data.rules || '',
-        data.root_path || null,
+        normalizedRootPath,
       ]
     );
 
@@ -79,8 +108,9 @@ export class ProjectService {
     }
 
     if (data.root_path !== undefined) {
+      const normalizedRootPath = data.root_path ? normalizeRootPath(data.root_path) : null;
       updates.push(`root_path = $${paramIndex++}`);
-      values.push(data.root_path || null);
+      values.push(normalizedRootPath);
     }
 
     if (updates.length === 0) return;
@@ -122,30 +152,35 @@ export class ProjectService {
 
   @timedMethod('getProjectByRootPath')
   async getProjectByRootPath(rootPath: string): Promise<Project | null> {
-    const result = await this.db.select<Project[]>('SELECT * FROM projects WHERE root_path = $1', [
-      rootPath,
-    ]);
+    const lookupValues = buildRootPathLookupValues(rootPath);
+    const placeholders = lookupValues.map((_, idx) => `$${idx + 1}`).join(', ');
+    const result = await this.db.select<Project[]>(
+      `SELECT * FROM projects WHERE root_path IN (${placeholders}) LIMIT 1`,
+      lookupValues
+    );
 
     return result[0] || null;
   }
 
   @timedMethod('createOrGetProjectForRepository')
   async createOrGetProjectForRepository(rootPath: string): Promise<Project> {
+    const normalizedRootPath = normalizeRootPath(rootPath);
+
     // First, check if a project already exists for this repository
-    const existingProject = await this.getProjectByRootPath(rootPath);
+    const existingProject = await this.getProjectByRootPath(normalizedRootPath);
     if (existingProject) {
       return existingProject;
     }
 
     // Extract repository name from path
-    const pathSegments = rootPath.split(/[/\\]/);
+    const pathSegments = normalizedRootPath.split(/[/\\]/).filter((segment) => segment.length > 0);
     const repoName = pathSegments[pathSegments.length - 1] || 'Unnamed Repository';
 
     // Create a new project for this repository
     const projectId = await this.createProject({
       name: repoName,
-      description: `Project for repository: ${rootPath}`,
-      root_path: rootPath,
+      description: `Project for repository: ${normalizedRootPath}`,
+      root_path: normalizedRootPath,
       context: '',
       rules: '',
     });

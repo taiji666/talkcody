@@ -5,7 +5,6 @@
 import { useClaudeOAuthStore } from '@/providers/oauth/claude-oauth-store';
 import { useGitHubCopilotOAuthStore } from '@/providers/oauth/github-copilot-oauth-store';
 import { useOpenAIOAuthStore } from '@/providers/oauth/openai-oauth-store';
-import { useQwenCodeOAuthStore } from '@/providers/oauth/qwen-code-oauth-store';
 
 /**
  * OAuth connection status map type
@@ -14,7 +13,6 @@ import { useQwenCodeOAuthStore } from '@/providers/oauth/qwen-code-oauth-store';
 export type OAuthStatusMap = {
   anthropic: boolean;
   openai: boolean;
-  qwen_code: boolean;
   github_copilot: boolean;
 };
 
@@ -35,13 +33,11 @@ export type OAuthStatusMap = {
 export function useOAuthStatus(): OAuthStatusMap {
   const anthropicConnected = useClaudeOAuthStore((state) => state.isConnected);
   const openaiConnected = useOpenAIOAuthStore((state) => state.isConnected);
-  const qwenConnected = useQwenCodeOAuthStore((state) => state.isConnected);
   const githubCopilotConnected = useGitHubCopilotOAuthStore((state) => state.isConnected);
 
   return {
     anthropic: anthropicConnected,
     openai: openaiConnected,
-    qwen_code: qwenConnected,
     github_copilot: githubCopilotConnected,
   };
 }

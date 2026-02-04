@@ -6,7 +6,6 @@ use crate::llm::protocols::{
     header_builder::HeaderBuildContext,
     request_builder::RequestBuildContext,
     stream_parser::{StreamParseContext, StreamParseState},
-    ProtocolHeaderBuilder,
 };
 use crate::llm::types::ProtocolType;
 use crate::llm::types::{Message, ProviderConfig, StreamEvent, ToolDefinition, TraceContext};
@@ -27,6 +26,7 @@ pub struct ProviderContext<'a> {
     pub top_p: Option<f32>,
     pub top_k: Option<i32>,
     pub provider_options: Option<&'a Value>,
+    #[allow(dead_code)]
     pub trace_context: Option<&'a TraceContext>,
 }
 
@@ -38,6 +38,7 @@ pub enum ProviderCredentials {
     ApiKey(String),
     OAuth {
         token: String,
+        #[allow(dead_code)]
         account_id: Option<String>,
     },
 }
@@ -53,6 +54,7 @@ pub struct BuiltRequest {
 /// Trait for provider-specific logic
 /// Each provider can override specific behaviors while inheriting defaults from the base protocol
 #[async_trait]
+#[allow(dead_code)]
 pub trait Provider: Send + Sync {
     /// Provider identifier
     fn id(&self) -> &str;

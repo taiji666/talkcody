@@ -4,7 +4,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { BaseDirectory, exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '@/lib/logger';
 import type { ProxyRequest, ProxyResponse } from '@/lib/tauri-fetch';
-import { getOAuthToken } from '@/providers/config/oauth-config';
 import { PROVIDER_CONFIGS, PROVIDERS_WITH_INTERNATIONAL } from '@/providers/config/provider-config';
 import { customProviderService } from '@/providers/custom/custom-provider-service';
 import { useProviderStore } from '@/providers/stores/provider-store';
@@ -40,7 +39,6 @@ const PROVIDER_MODELS_ENDPOINTS: Record<string, string | null> = {
   aiGateway: 'https://ai-gateway.vercel.sh/v1/models',
   moonshot: 'https://api.moonshot.cn/v1/models',
   github_copilot: 'https://api.githubcopilot.com/models',
-  qwen_code: 'https://dashscope.aliyuncs.com/compatible-mode/v1/models',
   // Non-AI providers, no need to test
   tavily: null,
   serper: null,

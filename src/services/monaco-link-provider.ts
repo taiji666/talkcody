@@ -6,6 +6,44 @@ import type * as Monaco from 'monaco-editor';
 import { logger } from '@/lib/logger';
 import { settingsManager } from '@/stores/settings-store';
 
+const GO_IMPORT_SINGLE = /(?:^|\n)\s*import\s+(?:[\w.]+\s+)?["']([^"']+)["']/g;
+const GO_IMPORT_BLOCK = /(?:^|\n)\s*import\s*\(([^)]*)\)/g;
+const GO_IMPORT_BLOCK_LINE = /\s*(?:[\w.]+\s+)?["']([^"']+)["']/g;
+
+export function extractGoImportMatches(
+  content: string
+): Array<{ start: number; importPath: string }> {
+  const matches: Array<{ start: number; importPath: string }> = [];
+
+  GO_IMPORT_SINGLE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = GO_IMPORT_SINGLE.exec(content)) !== null) {
+    if (!match[1]) continue;
+    const pathStart = match[0].indexOf(match[1]);
+    if (pathStart === -1) continue;
+    matches.push({ start: match.index + pathStart, importPath: match[1] });
+  }
+
+  GO_IMPORT_BLOCK.lastIndex = 0;
+  while ((match = GO_IMPORT_BLOCK.exec(content)) !== null) {
+    const block = match[1] ?? '';
+    GO_IMPORT_BLOCK_LINE.lastIndex = 0;
+    let lineMatch: RegExpExecArray | null;
+    while ((lineMatch = GO_IMPORT_BLOCK_LINE.exec(block)) !== null) {
+      if (!lineMatch[1]) continue;
+      const pathStart = lineMatch[0].indexOf(lineMatch[1]);
+      if (pathStart === -1) continue;
+      const blockStartOffset = match.index + match[0].indexOf(block);
+      matches.push({
+        start: blockStartOffset + lineMatch.index + pathStart,
+        importPath: lineMatch[1],
+      });
+    }
+  }
+
+  return matches;
+}
+
 // Import patterns for each language
 const LANGUAGE_IMPORT_PATTERNS: Record<string, RegExp[]> = {
   typescript: [
@@ -41,12 +79,7 @@ const LANGUAGE_IMPORT_PATTERNS: Record<string, RegExp[]> = {
     // mod module_name
     /mod\s+(\w+)/g,
   ],
-  go: [
-    // import "package/path"
-    /import\s+["']([^"']+)["']/g,
-    // import ( "package/path" )
-    /["']([^"']+)["']/g,
-  ],
+  go: [],
   vue: [
     // import { xxx } from 'path'
     /(?:import\s+\{[^}]*\}\s+from\s+['"])([^'"]+)(?:['"])/g,
@@ -79,6 +112,7 @@ const PATH_RESOLVERS: Record<string, PathResolver> = {
   typescript: ({ importPath, rootPath, currentFile }) => {
     const paths: string[] = [];
     const extensions = EXTENSION_MAPPINGS.typescript || [];
+    const normalizedCurrentFile = currentFile.replace(/\\/g, '/');
 
     // Handle @/ alias -> src/
     if (importPath.startsWith('@/')) {
@@ -92,7 +126,7 @@ const PATH_RESOLVERS: Record<string, PathResolver> = {
     }
     // Handle relative paths
     else if (importPath.startsWith('./') || importPath.startsWith('../')) {
-      const currentDir = currentFile.substring(0, currentFile.lastIndexOf('/'));
+      const currentDir = normalizedCurrentFile.substring(0, normalizedCurrentFile.lastIndexOf('/'));
       const basePath = resolvePath(currentDir, importPath);
       for (const ext of extensions) {
         paths.push(`${basePath}${ext}`);
@@ -122,7 +156,8 @@ const PATH_RESOLVERS: Record<string, PathResolver> = {
   cpp: ({ importPath, rootPath, currentFile }) => {
     const paths: string[] = [];
     // Relative to current file
-    const currentDir = currentFile.substring(0, currentFile.lastIndexOf('/'));
+    const normalizedCurrentFile = currentFile.replace(/\\/g, '/');
+    const currentDir = normalizedCurrentFile.substring(0, normalizedCurrentFile.lastIndexOf('/'));
     paths.push(resolvePath(currentDir, importPath));
     // Relative to root
     paths.push(`${rootPath}/${importPath}`);
@@ -148,7 +183,8 @@ const PATH_RESOLVERS: Record<string, PathResolver> = {
       paths.push(`${rootPath}/${modulePath}${ext}`);
     }
     // Relative to current file's directory
-    const currentDir = currentFile.substring(0, currentFile.lastIndexOf('/'));
+    const normalizedCurrentFile = currentFile.replace(/\\/g, '/');
+    const currentDir = normalizedCurrentFile.substring(0, normalizedCurrentFile.lastIndexOf('/'));
     for (const ext of extensions) {
       paths.push(`${currentDir}/${modulePath}${ext}`);
     }
@@ -170,7 +206,8 @@ const PATH_RESOLVERS: Record<string, PathResolver> = {
       paths.push(`${rootPath}/src/${modulePath}${ext}`);
     }
     // Relative to current file
-    const currentDir = currentFile.substring(0, currentFile.lastIndexOf('/'));
+    const normalizedCurrentFile = currentFile.replace(/\\/g, '/');
+    const currentDir = normalizedCurrentFile.substring(0, normalizedCurrentFile.lastIndexOf('/'));
     for (const ext of extensions) {
       paths.push(`${currentDir}/${modulePath}${ext}`);
     }
@@ -194,8 +231,10 @@ const PATH_RESOLVERS: Record<string, PathResolver> = {
 
 // Helper function to resolve relative paths
 function resolvePath(basePath: string, relativePath: string): string {
-  const parts = basePath.split('/').filter(Boolean);
+  const normalizedBase = basePath.replace(/\\/g, '/').replace(/\/$/, '');
+  const parts = normalizedBase.split('/').filter(Boolean);
   const relParts = relativePath.split('/');
+  const rootPrefix = normalizedBase.startsWith('/') ? '/' : '';
 
   for (const part of relParts) {
     if (part === '..') {
@@ -205,7 +244,7 @@ function resolvePath(basePath: string, relativePath: string): string {
     }
   }
 
-  return `/${parts.join('/')}`;
+  return `${rootPrefix}${parts.join('/')}`;
 }
 
 // Store disposables for cleanup
@@ -232,6 +271,32 @@ export function registerImportLinkProviders(monaco: typeof Monaco) {
         const links: Monaco.languages.ILink[] = [];
         const content = model.getValue();
         const currentFile = model.uri.path;
+
+        if (langId === 'go') {
+          for (const match of extractGoImportMatches(content)) {
+            const startPos = model.getPositionAt(match.start);
+            const endPos = model.getPositionAt(match.start + match.importPath.length);
+
+            links.push({
+              range: new monaco.Range(
+                startPos.lineNumber,
+                startPos.column,
+                endPos.lineNumber,
+                endPos.column
+              ),
+              url: undefined,
+              data: {
+                importPath: match.importPath,
+                langId,
+                rootPath,
+                currentFile,
+              },
+            } as Monaco.languages.ILink);
+          }
+
+          logger.debug(`[LinkProvider] Found ${links.length} import links in ${langId} file`);
+          return { links };
+        }
 
         for (const pattern of patterns) {
           // Reset regex state

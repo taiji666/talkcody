@@ -2,7 +2,9 @@ use crate::llm::types::{Message, StreamEvent, ToolDefinition};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(test)]
+use std::path::PathBuf;
 
 #[cfg(test)]
 const ANY_VALUE_SENTINEL: &str = "__ANY__";
@@ -62,6 +64,8 @@ pub struct RecordedSseEvent {
     pub data: String,
 }
 
+#[allow(dead_code)]
+#[cfg(test)]
 pub fn fixture_file_name(fixture: &ProviderFixture) -> String {
     let model = fixture.model.replace('/', "_").replace(' ', "_");
     format!(
@@ -70,6 +74,8 @@ pub fn fixture_file_name(fixture: &ProviderFixture) -> String {
     )
 }
 
+#[allow(dead_code)]
+#[cfg(test)]
 pub fn fixture_path(dir: &Path, fixture: &ProviderFixture) -> PathBuf {
     dir.join(fixture_file_name(fixture))
 }

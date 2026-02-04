@@ -43,6 +43,7 @@ impl OpenAiProvider {
     }
 
     /// Build request for OAuth/Codex API format
+    #[cfg(test)]
     pub(crate) fn build_oauth_request(&self, ctx: &ProviderContext<'_>) -> Result<Value, String> {
         let request_ctx = RequestBuildContext {
             model: ctx.model,
@@ -217,7 +218,6 @@ mod tests {
     use crate::llm::auth::api_key_manager::ApiKeyManager;
     use crate::llm::protocols::openai_responses_protocol::{
         parse_openai_oauth_event_legacy, parse_openai_oauth_function_call_done,
-        OpenAiResponsesProtocol,
     };
     use crate::llm::protocols::{ProtocolStreamState, ToolCallAccum};
     use crate::llm::types::{ContentPart, Message, MessageContent, StreamTextRequest};

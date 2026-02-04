@@ -1,18 +1,57 @@
 // src/services/agents/ralph-loop-service.ts
+/**
+ * Ralph Loop Service - Completion Hook Implementation
+ *
+ * Ralph Loop is now implemented as a completion hook that integrates into
+ * LLMService's completion hook pipeline. Instead of running its own loop,
+ * it evaluates completion criteria and decides whether to continue or stop.
+ *
+ * Hook Priority: 20 (after stop hook: 10, before auto review: 30)
+ */
 
 import { logger } from '@/lib/logger';
 import { generateId } from '@/lib/utils';
-import { messageService } from '@/services/message-service';
 import { taskFileService } from '@/services/task-file-service';
 import { useFileChangesStore } from '@/stores/file-changes-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
-import type { AgentToolSet, MessageAttachment, UIMessage } from '@/types/agent';
+import type { MessageAttachment, UIMessage } from '@/types/agent';
+import type {
+  CompletionHook,
+  CompletionHookContext,
+  CompletionHookResult,
+  ToolSummary,
+} from '@/types/completion-hooks';
 import type { RalphLoopConfig, RalphLoopStateFile, RalphLoopStopReason } from '@/types/ralph-loop';
 import type { TaskSettings } from '@/types/task';
-import type { LLMService } from './llm-service';
 
-const DEFAULT_CONFIG: RalphLoopConfig = {
+// Completion promise instructions added to system prompt
+export const COMPLETION_PROMISE = [
+  'Ralph Loop completion promise:',
+  '- When the task is fully done, output exactly: <ralph>COMPLETE</ralph>',
+  '- If blocked, output exactly: <ralph>BLOCKED: reason</ralph>',
+].join('\n');
+
+/**
+ * Tool result type guard for bash tool
+ */
+export type BashToolResult = {
+  success?: boolean;
+  command?: string;
+  message?: string;
+  output?: string;
+  error?: string;
+};
+
+export function isBashResult(value: unknown): value is BashToolResult {
+  if (!value || typeof value !== 'object') return false;
+  return 'success' in value || 'command' in value || 'error' in value;
+}
+
+/**
+ * Default Ralph Loop configuration
+ */
+export const DEFAULT_CONFIG: RalphLoopConfig = {
   enabled: true,
   maxIterations: 6,
   maxWallTimeMs: 60 * 60 * 1000,
@@ -34,105 +73,7 @@ const DEFAULT_CONFIG: RalphLoopConfig = {
   },
 };
 
-const COMPLETION_PROMISE = [
-  'Ralph Loop completion promise:',
-  '- When the task is fully done, output exactly: <ralph>COMPLETE</ralph>',
-  '- If blocked, output exactly: <ralph>BLOCKED: reason</ralph>',
-].join('\n');
-
-type BashToolResult = {
-  success?: boolean;
-  command?: string;
-  message?: string;
-  output?: string;
-  error?: string;
-};
-
-type IterationToolSummary = {
-  toolName: string;
-  command?: string;
-  success?: boolean;
-  output?: string;
-  error?: string;
-};
-
-type IterationRunResult = {
-  fullText: string;
-  errors: string[];
-  toolSummaries: IterationToolSummary[];
-};
-
-export interface RalphLoopRunOptions {
-  taskId: string;
-  messages: UIMessage[];
-  model: string;
-  systemPrompt?: string;
-  tools?: AgentToolSet;
-  agentId?: string;
-  userMessage?: string;
-  llmService: LLMService;
-  abortController: AbortController;
-  onStatus?: (status: string) => void;
-  onAttachment?: (attachment: MessageAttachment) => void;
-}
-
-export interface RalphLoopRunResult {
-  success: boolean;
-  fullText: string;
-  stopReason: RalphLoopStopReason;
-  stopMessage?: string;
-  iterations: number;
-}
-
-function parseTaskSettings(taskId: string): TaskSettings | null {
-  const task = useTaskStore.getState().getTask(taskId);
-  if (!task?.settings) return null;
-  try {
-    return JSON.parse(task.settings) as TaskSettings;
-  } catch (error) {
-    logger.warn('[RalphLoop] Failed to parse task settings', { taskId, error });
-    return null;
-  }
-}
-
-function isRalphLoopEnabled(taskId: string): boolean {
-  const globalEnabled = useSettingsStore.getState().getRalphLoopEnabled();
-  const settings = parseTaskSettings(taskId);
-  if (typeof settings?.ralphLoopEnabled === 'boolean') {
-    return settings.ralphLoopEnabled;
-  }
-  return globalEnabled;
-}
-
-function buildStopRegex(pattern?: string): RegExp | null {
-  if (!pattern) return null;
-  try {
-    return new RegExp(pattern, 'i');
-  } catch (error) {
-    logger.warn('[RalphLoop] Invalid stop regex, ignoring', { pattern, error });
-    return null;
-  }
-}
-
-function coerceUserContent(content: UIMessage['content']): string {
-  if (typeof content === 'string') return content;
-  try {
-    return JSON.stringify(content);
-  } catch {
-    return '';
-  }
-}
-
-function isBashResult(value: unknown): value is BashToolResult {
-  if (!value || typeof value !== 'object') return false;
-  return 'success' in value || 'command' in value || 'error' in value;
-}
-
-function matchCommand(command: string | undefined, patterns: RegExp[]): boolean {
-  if (!command) return false;
-  return patterns.some((pattern) => pattern.test(command.trim()));
-}
-
+// Command patterns for test/lint/tsc detection
 const TEST_COMMAND_PATTERNS = [
   /^bun\s+run\s+test(\b|:)/,
   /^npm\s+(run\s+)?test(\b|:)/,
@@ -157,179 +98,309 @@ const LINT_COMMAND_PATTERNS = [
 
 const TSC_COMMAND_PATTERNS = [/^bun\s+run\s+tsc(\b|:)/, /^tsc(\b|\s)/];
 
-export class RalphLoopService {
-  async runLoop(options: RalphLoopRunOptions): Promise<RalphLoopRunResult> {
-    const {
+/**
+ * Parse task settings to check Ralph Loop override
+ */
+function parseTaskSettings(taskId: string): TaskSettings | null {
+  const task = useTaskStore.getState().getTask(taskId);
+  if (!task?.settings) return null;
+  try {
+    return JSON.parse(task.settings) as TaskSettings;
+  } catch (error) {
+    logger.warn('[RalphLoop] Failed to parse task settings', { taskId, error });
+    return null;
+  }
+}
+
+/**
+ * Check if Ralph Loop is enabled for a task
+ */
+export function isRalphLoopEnabled(taskId: string): boolean {
+  const globalEnabled = useSettingsStore.getState().getRalphLoopEnabled();
+  const settings = parseTaskSettings(taskId);
+  if (typeof settings?.ralphLoopEnabled === 'boolean') {
+    return settings.ralphLoopEnabled;
+  }
+  return globalEnabled;
+}
+
+/**
+ * Build regex for stop patterns
+ */
+function buildStopRegex(pattern?: string): RegExp | null {
+  if (!pattern) return null;
+  try {
+    return new RegExp(pattern, 'i');
+  } catch (error) {
+    logger.warn('[RalphLoop] Invalid stop regex, ignoring', { pattern, error });
+    return null;
+  }
+}
+
+/**
+ * Check if command matches any pattern
+ */
+function matchCommand(command: string | undefined, patterns: RegExp[]): boolean {
+  if (!command) return false;
+  return patterns.some((pattern) => pattern.test(command.trim()));
+}
+
+/**
+ * Get base user message from messages array
+ */
+function getBaseUserMessage(messages: UIMessage[]): string {
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+  if (!lastUserMessage) return '';
+
+  const content = lastUserMessage.content;
+  if (typeof content === 'string') return content;
+  try {
+    return JSON.stringify(content);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Ralph Loop Service - Completion Hook Implementation
+ *
+ * Implements the CompletionHook interface to integrate with LLMService's
+ * completion hook pipeline.
+ */
+export class RalphLoopService implements CompletionHook {
+  /** Hook name for identification */
+  readonly name = 'ralph-loop';
+
+  /** Hook priority (20 = after stop hook, before auto review) */
+  readonly priority = 20;
+
+  /**
+   * Check if this hook should run
+   */
+  shouldRun(context: CompletionHookContext): boolean {
+    return isRalphLoopEnabled(context.taskId);
+  }
+
+  /**
+   * Execute Ralph Loop evaluation
+   *
+   * This method is called by LLMService after a successful agent loop finish.
+   * It evaluates stop criteria and decides whether to continue or stop.
+   */
+  async run(context: CompletionHookContext): Promise<CompletionHookResult> {
+    const { taskId, fullText, toolSummaries, iteration, startTime } = context;
+
+    logger.info('[RalphLoop] Running completion hook', {
       taskId,
-      messages,
-      model,
-      systemPrompt,
-      tools = {},
-      agentId,
-      userMessage,
-      llmService,
-      abortController,
-      onStatus,
-      onAttachment,
-    } = options;
+      iteration,
+      toolSummaryCount: toolSummaries.length,
+    });
 
-    if (!isRalphLoopEnabled(taskId)) {
-      throw new Error('Ralph Loop is not enabled for this task');
-    }
-
-    const startTime = Date.now();
     const config = { ...DEFAULT_CONFIG };
-
-    let iterations = 0;
-    let finalText = '';
-    let stopReason: RalphLoopStopReason = 'unknown';
-    let stopMessage: string | undefined;
-
-    const summaryFile = config.memory.summaryFileName;
-    const feedbackFile = config.memory.feedbackFileName;
-    const stateFile = config.memory.stateFileName;
-
     const successRegex = buildStopRegex(config.stopCriteria.successRegex);
     const blockedRegex = buildStopRegex(config.stopCriteria.blockedRegex);
 
-    const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
-    const baseUserMessage = userMessage || coerceUserContent(lastUserMessage?.content ?? '');
+    // Check wall time
+    const elapsed = Date.now() - startTime;
+    if (elapsed > config.maxWallTimeMs) {
+      logger.info('[RalphLoop] Max wall time reached', { elapsed, max: config.maxWallTimeMs });
 
-    if (!baseUserMessage) {
-      throw new Error('Ralph Loop requires a user task to run');
-    }
-
-    const attachments = lastUserMessage?.attachments || [];
-
-    while (iterations < config.maxIterations) {
-      if (abortController.signal.aborted) {
-        stopReason = 'error';
-        stopMessage = 'Aborted by user';
-        break;
-      }
-
-      const elapsed = Date.now() - startTime;
-      if (elapsed > config.maxWallTimeMs) {
-        stopReason = 'max-wall-time';
-        stopMessage = 'Reached max wall time';
-        break;
-      }
-
-      iterations += 1;
-      onStatus?.(`Ralph Loop: iteration ${iterations}/${config.maxIterations}`);
-
-      const iterationMessages = await this.buildIterationMessages({
+      await this.persistFinalState({
         taskId,
-        messages,
-        userMessage: baseUserMessage,
-        attachments,
-        summaryFile,
-        feedbackFile,
-        includeLastN: config.context.includeLastNMessages,
-      });
-
-      if (abortController.signal.aborted) {
-        stopReason = 'error';
-        stopMessage = 'Aborted by user';
-        break;
-      }
-
-      let iterationResult: IterationRunResult;
-      try {
-        iterationResult = await this.runIteration({
-          taskId,
-          messages: iterationMessages,
-          model,
-          systemPrompt: this.buildSystemPrompt(systemPrompt, config),
-          tools,
-          agentId,
-          llmService,
-          abortController,
-          onStatus,
-          onAttachment,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        iterationResult = { fullText: finalText, errors: [message], toolSummaries: [] };
-        stopReason = 'error';
-        stopMessage = message;
-      }
-
-      if (stopReason === 'error') {
-        await this.persistIterationArtifacts({
-          taskId,
-          iteration: iterations,
-          startTime,
-          userMessage: baseUserMessage,
-          summaryFile,
-          feedbackFile,
-          stateFile,
-          iterationResult,
-          evaluation: {
-            stopReason,
-            stopMessage,
-            completionPromiseMatched: false,
-            errors: iterationResult.errors,
-          },
-        });
-        break;
-      }
-
-      finalText = iterationResult.fullText;
-
-      const evaluation = this.evaluateStopCriteria({
-        fullText: finalText,
-        errors: iterationResult.errors,
-        toolSummaries: iterationResult.toolSummaries,
-        successRegex,
-        blockedRegex,
-        stopCriteria: config.stopCriteria,
-      });
-
-      await this.persistIterationArtifacts({
-        taskId,
-        iteration: iterations,
+        iteration,
         startTime,
-        userMessage: baseUserMessage,
-        summaryFile,
-        feedbackFile,
-        stateFile,
-        iterationResult,
-        evaluation,
+        stopReason: 'max-wall-time',
+        stopMessage: 'Reached max wall time',
       });
 
-      if (evaluation.shouldStop) {
-        stopReason = evaluation.stopReason;
-        stopMessage = evaluation.stopMessage;
-        break;
-      }
+      return {
+        action: 'stop',
+        stopReason: 'max-wall-time',
+        stopMessage: 'Reached max wall time',
+      };
     }
 
-    if (stopReason === 'unknown' && iterations >= config.maxIterations) {
-      stopReason = 'max-iterations';
-      stopMessage = 'Reached max iterations';
+    // Check max iterations
+    if (iteration >= config.maxIterations) {
+      logger.info('[RalphLoop] Max iterations reached', { iteration, max: config.maxIterations });
+
+      await this.persistFinalState({
+        taskId,
+        iteration,
+        startTime,
+        stopReason: 'max-iterations',
+        stopMessage: 'Reached max iterations',
+      });
+
+      return {
+        action: 'stop',
+        stopReason: 'max-iterations',
+        stopMessage: 'Reached max iterations',
+      };
     }
 
-    await this.persistFinalState({
+    // Evaluate stop criteria
+    const evaluation = this.evaluateStopCriteria({
+      fullText,
+      toolSummaries,
+      successRegex,
+      blockedRegex,
+      stopCriteria: config.stopCriteria,
+    });
+
+    // Persist iteration artifacts
+    await this.persistIterationArtifacts({
       taskId,
-      iteration: iterations,
+      iteration,
       startTime,
-      summaryFile,
-      stateFile,
-      stopReason,
-      stopMessage,
+      fullText,
+      toolSummaries,
+      evaluation,
+    });
+
+    // If should stop, return stop action
+    if (evaluation.shouldStop) {
+      logger.info('[RalphLoop] Stop criteria met', {
+        stopReason: evaluation.stopReason,
+        stopMessage: evaluation.stopMessage,
+      });
+
+      return {
+        action: 'stop',
+        stopReason: evaluation.stopReason,
+        stopMessage: evaluation.stopMessage,
+      };
+    }
+
+    // Continue with fresh context
+    logger.info('[RalphLoop] Continuing to next iteration', { iteration: iteration + 1 });
+
+    const nextMessages = await this.buildIterationMessages({
+      taskId,
+      includeLastN: config.context.includeLastNMessages,
     });
 
     return {
-      success: stopReason === 'complete',
-      fullText: finalText,
-      stopReason,
-      stopMessage,
-      iterations,
+      action: 'continue',
+      nextMessages,
     };
   }
 
-  private buildSystemPrompt(systemPrompt: string | undefined, config: RalphLoopConfig): string {
+  /**
+   * Evaluate stop criteria based on full text and tool results
+   */
+  evaluateStopCriteria(params: {
+    fullText: string;
+    toolSummaries: ToolSummary[];
+    successRegex: RegExp | null;
+    blockedRegex: RegExp | null;
+    stopCriteria: RalphLoopConfig['stopCriteria'];
+  }): {
+    shouldStop: boolean;
+    stopReason: RalphLoopStopReason;
+    stopMessage?: string;
+    completionPromiseMatched: boolean;
+  } {
+    const { fullText, toolSummaries, successRegex, blockedRegex, stopCriteria } = params;
+
+    // Check for blocked marker
+    const blockedMatch = blockedRegex?.exec(fullText || '');
+    if (blockedMatch) {
+      return {
+        shouldStop: true,
+        stopReason: 'blocked',
+        stopMessage: blockedMatch[1]?.trim() || 'Blocked',
+        completionPromiseMatched: false,
+      };
+    }
+
+    // Check for completion marker
+    const completionPromiseMatched = successRegex ? successRegex.test(fullText || '') : false;
+
+    if (!completionPromiseMatched) {
+      return {
+        shouldStop: false,
+        stopReason: 'unknown',
+        completionPromiseMatched: false,
+      };
+    }
+
+    // Completion marker found - check additional criteria
+    const commandMatches = (patterns: RegExp[]) =>
+      toolSummaries.filter((summary) => summary.command && matchCommand(summary.command, patterns));
+
+    const testResults = commandMatches(TEST_COMMAND_PATTERNS);
+    const lintResults = commandMatches(LINT_COMMAND_PATTERNS);
+    const tscResults = commandMatches(TSC_COMMAND_PATTERNS);
+
+    const testsPassed = testResults.some((result) => result.success === true);
+    const lintPassed = lintResults.some((result) => result.success === true);
+    const tscPassed = tscResults.some((result) => result.success === true);
+
+    // Check for errors in tool results
+    const hasToolErrors = toolSummaries.some(
+      (summary) => summary.error || summary.success === false
+    );
+
+    // Evaluate all criteria
+    // If requireNoErrors is true and there are errors, block completion
+    if (stopCriteria.requireNoErrors && hasToolErrors) {
+      return {
+        shouldStop: false,
+        stopReason: 'unknown',
+        completionPromiseMatched: true,
+      };
+    }
+
+    // If requirePassingTests is true, we need:
+    // - At least one test command to have been executed (testResults.length > 0)
+    // - All test commands to have passed (testsPassed)
+    const testsSatisfied =
+      !stopCriteria.requirePassingTests || (testResults.length > 0 && testsPassed);
+    if (!testsSatisfied) {
+      return {
+        shouldStop: false,
+        stopReason: 'unknown',
+        completionPromiseMatched: true,
+      };
+    }
+
+    // If requireLint is true, we need:
+    // - At least one lint command to have been executed (lintResults.length > 0)
+    // - All lint commands to have passed (lintPassed)
+    const lintSatisfied = !stopCriteria.requireLint || (lintResults.length > 0 && lintPassed);
+    if (!lintSatisfied) {
+      return {
+        shouldStop: false,
+        stopReason: 'unknown',
+        completionPromiseMatched: true,
+      };
+    }
+
+    // If requireTsc is true, we need:
+    // - At least one tsc command to have been executed (tscResults.length > 0)
+    // - All tsc commands to have passed (tscPassed)
+    const tscSatisfied = !stopCriteria.requireTsc || (tscResults.length > 0 && tscPassed);
+    if (!tscSatisfied) {
+      return {
+        shouldStop: false,
+        stopReason: 'unknown',
+        completionPromiseMatched: true,
+      };
+    }
+
+    // All criteria met - can stop
+    return {
+      shouldStop: true,
+      stopReason: 'complete',
+      completionPromiseMatched: true,
+    };
+  }
+
+  /**
+   * Build system prompt with Ralph instructions
+   */
+  buildSystemPrompt(baseSystemPrompt: string | undefined, config: RalphLoopConfig): string {
     const stopRules: string[] = [];
 
     if (config.stopCriteria.requirePassingTests) {
@@ -349,26 +420,37 @@ export class RalphLoopService {
       ? ['Stop criteria:', ...stopRules].join('\n')
       : 'Stop criteria: No additional automated checks required.';
 
-    return [systemPrompt, 'Ralph Loop mode is enabled.', COMPLETION_PROMISE, stopRulesText]
+    return [baseSystemPrompt, 'Ralph Loop mode is enabled.', COMPLETION_PROMISE, stopRulesText]
       .filter(Boolean)
       .join('\n\n');
   }
 
-  private async buildIterationMessages(params: {
+  /**
+   * Build iteration messages for next Ralph iteration
+   */
+  async buildIterationMessages(params: {
     taskId: string;
-    messages: UIMessage[];
-    userMessage: string;
-    attachments: MessageAttachment[];
-    summaryFile: string;
-    feedbackFile: string;
     includeLastN?: number;
   }): Promise<UIMessage[]> {
-    const { taskId, messages, userMessage, attachments, summaryFile, feedbackFile, includeLastN } =
-      params;
+    const { taskId, includeLastN } = params;
 
-    const summary = await taskFileService.readFile('context', taskId, summaryFile);
-    const feedback = await taskFileService.readFile('context', taskId, feedbackFile);
+    const summary = await taskFileService.readFile(
+      'context',
+      taskId,
+      DEFAULT_CONFIG.memory.summaryFileName
+    );
+    const feedback = await taskFileService.readFile(
+      'context',
+      taskId,
+      DEFAULT_CONFIG.memory.feedbackFileName
+    );
 
+    // Get original user message from task
+    const task = useTaskStore.getState().getTask(taskId);
+    const messages = useTaskStore.getState().getMessages(taskId);
+    const userMessage = task?.title || getBaseUserMessage(messages);
+
+    // Get recent messages if configured
     const recentMessages = includeLastN && includeLastN > 0 ? messages.slice(-includeLastN) : [];
 
     const promptSections = ['## Task', userMessage];
@@ -380,6 +462,10 @@ export class RalphLoopService {
     if (feedback) {
       promptSections.push('## Ralph Feedback', feedback);
     }
+
+    // Get attachments from original message
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+    const attachments: MessageAttachment[] = lastUserMessage?.attachments || [];
 
     return [
       ...recentMessages,
@@ -393,257 +479,38 @@ export class RalphLoopService {
     ];
   }
 
-  private async runIteration(params: {
-    taskId: string;
-    messages: UIMessage[];
-    model: string;
-    systemPrompt?: string;
-    tools: AgentToolSet;
-    agentId?: string;
-    llmService: LLMService;
-    abortController: AbortController;
-    onStatus?: (status: string) => void;
-    onAttachment?: (attachment: MessageAttachment) => void;
-  }): Promise<IterationRunResult> {
-    const {
-      taskId,
-      messages,
-      model,
-      systemPrompt,
-      tools,
-      agentId,
-      llmService,
-      abortController,
-      onStatus,
-      onAttachment,
-    } = params;
-
-    let currentMessageId = '';
-    let streamedContent = '';
-    let fullText = '';
-    const errors: string[] = [];
-    const toolSummaries: IterationToolSummary[] = [];
-
-    await llmService.runAgentLoop(
-      {
-        messages,
-        model,
-        systemPrompt,
-        tools,
-        agentId,
-        compression: { enabled: false },
-        freshContext: true,
-      },
-      {
-        onAssistantMessageStart: () => {
-          if (abortController.signal.aborted) return;
-
-          if (currentMessageId && !streamedContent) {
-            return;
-          }
-
-          if (currentMessageId && streamedContent) {
-            messageService
-              .finalizeMessage(taskId, currentMessageId, streamedContent)
-              .catch((err) => logger.error('[RalphLoop] Failed to finalize message', err));
-          }
-
-          streamedContent = '';
-          currentMessageId = messageService.createAssistantMessage(taskId, agentId);
-        },
-        onChunk: (chunk: string) => {
-          if (abortController.signal.aborted) return;
-          streamedContent += chunk;
-          if (currentMessageId) {
-            messageService.updateStreamingContent(taskId, currentMessageId, streamedContent);
-          }
-          fullText += chunk;
-        },
-        onComplete: async (finalText: string) => {
-          if (abortController.signal.aborted) return;
-
-          if (currentMessageId && streamedContent) {
-            await messageService.finalizeMessage(taskId, currentMessageId, streamedContent);
-            streamedContent = '';
-          }
-
-          if (finalText) {
-            fullText = finalText;
-          }
-        },
-        onError: (error: Error) => {
-          if (abortController.signal.aborted) return;
-          errors.push(error.message || 'Unknown error');
-        },
-        onStatus: (status: string) => {
-          if (abortController.signal.aborted) return;
-          onStatus?.(status);
-        },
-        onToolMessage: async (uiMessage: UIMessage) => {
-          if (abortController.signal.aborted) return;
-
-          const toolMessage: UIMessage = {
-            ...uiMessage,
-            assistantId: uiMessage.assistantId || agentId,
-          };
-
-          await messageService.addToolMessage(taskId, toolMessage);
-
-          const toolContent = Array.isArray(toolMessage.content) ? toolMessage.content[0] : null;
-          if (!toolContent || toolContent.type !== 'tool-result') return;
-
-          const output = toolContent.output;
-          if (isBashResult(output)) {
-            toolSummaries.push({
-              toolName: toolContent.toolName,
-              command: output.command,
-              success: output.success,
-              output: output.output,
-              error: output.error,
-            });
-            if (output.success === false || output.error) {
-              errors.push(output.error || 'Bash command failed');
-            }
-          } else if (output && typeof output === 'object' && 'error' in output) {
-            errors.push(String((output as { error?: string }).error || 'Tool error'));
-          }
-        },
-        onAttachment: async (attachment) => {
-          if (abortController.signal.aborted) return;
-          if (currentMessageId) {
-            await messageService.addAttachment(taskId, currentMessageId, attachment);
-          }
-          onAttachment?.(attachment);
-        },
-      },
-      abortController
-    );
-
-    return { fullText, errors, toolSummaries };
-  }
-
-  private evaluateStopCriteria(params: {
-    fullText: string;
-    errors: string[];
-    toolSummaries: IterationToolSummary[];
-    successRegex: RegExp | null;
-    blockedRegex: RegExp | null;
-    stopCriteria: RalphLoopConfig['stopCriteria'];
-  }): {
-    shouldStop: boolean;
-    stopReason: RalphLoopStopReason;
-    stopMessage?: string;
-    completionPromiseMatched: boolean;
-    errors: string[];
-  } {
-    const { fullText, errors, toolSummaries, successRegex, blockedRegex, stopCriteria } = params;
-    const blockedMatch = blockedRegex?.exec(fullText || '');
-    if (blockedMatch) {
-      return {
-        shouldStop: true,
-        stopReason: 'blocked',
-        stopMessage: blockedMatch[1]?.trim() || 'Blocked',
-        completionPromiseMatched: false,
-        errors,
-      };
-    }
-
-    const completionPromiseMatched = successRegex ? successRegex.test(fullText || '') : false;
-
-    const commandMatches = (patterns: RegExp[]) =>
-      toolSummaries.filter((summary) => summary.command && matchCommand(summary.command, patterns));
-
-    const testResults = commandMatches(TEST_COMMAND_PATTERNS);
-    const lintResults = commandMatches(LINT_COMMAND_PATTERNS);
-    const tscResults = commandMatches(TSC_COMMAND_PATTERNS);
-
-    const testsPassed = testResults.some((result) => result.success === true);
-    const lintPassed = lintResults.some((result) => result.success === true);
-    const tscPassed = tscResults.some((result) => result.success === true);
-
-    if (completionPromiseMatched) {
-      if (stopCriteria.requireNoErrors && errors.length > 0) {
-        return {
-          shouldStop: false,
-          stopReason: 'unknown',
-          completionPromiseMatched,
-          errors,
-        };
-      }
-      if (stopCriteria.requirePassingTests && !testsPassed) {
-        return {
-          shouldStop: false,
-          stopReason: 'unknown',
-          completionPromiseMatched,
-          errors,
-        };
-      }
-      if (stopCriteria.requireLint && !lintPassed) {
-        return {
-          shouldStop: false,
-          stopReason: 'unknown',
-          completionPromiseMatched,
-          errors,
-        };
-      }
-      if (stopCriteria.requireTsc && !tscPassed) {
-        return {
-          shouldStop: false,
-          stopReason: 'unknown',
-          completionPromiseMatched,
-          errors,
-        };
-      }
-
-      return {
-        shouldStop: true,
-        stopReason: 'complete',
-        completionPromiseMatched,
-        errors,
-      };
-    }
-
-    return {
-      shouldStop: false,
-      stopReason: 'unknown',
-      completionPromiseMatched,
-      errors,
-    };
-  }
-
+  /**
+   * Persist iteration artifacts
+   */
   private async persistIterationArtifacts(params: {
     taskId: string;
     iteration: number;
     startTime: number;
-    userMessage: string;
-    summaryFile: string;
-    feedbackFile: string;
-    stateFile: string;
-    iterationResult: IterationRunResult;
+    fullText: string;
+    toolSummaries: ToolSummary[];
     evaluation: {
+      shouldStop: boolean;
       stopReason: RalphLoopStopReason;
       stopMessage?: string;
       completionPromiseMatched: boolean;
-      errors: string[];
     };
   }): Promise<void> {
-    const {
-      taskId,
-      iteration,
-      startTime,
-      userMessage,
-      summaryFile,
-      feedbackFile,
-      stateFile,
-      iterationResult,
-      evaluation,
-    } = params;
+    const { taskId, iteration, startTime, fullText, toolSummaries, evaluation } = params;
 
-    const summary = await taskFileService.readFile('context', taskId, summaryFile);
-    const feedback = await taskFileService.readFile('context', taskId, feedbackFile);
+    const summaryFile = DEFAULT_CONFIG.memory.summaryFileName;
+    const _feedbackFile = DEFAULT_CONFIG.memory.feedbackFileName;
+    const stateFile = DEFAULT_CONFIG.memory.stateFileName;
 
+    // Read existing summary
+    const existingSummary = await taskFileService.readFile('context', taskId, summaryFile);
+
+    // Get file changes
     const changes = useFileChangesStore.getState().getChanges(taskId);
     const filesChanged = Array.from(new Set(changes.map((change) => change.filePath)));
+
+    // Get task info for objective
+    const messages = useTaskStore.getState().getMessages(taskId);
+    const userMessage = getBaseUserMessage(messages);
 
     // Build new iteration content
     const newIterationContent = [
@@ -657,26 +524,23 @@ export class RalphLoopService {
       filesChanged.length ? filesChanged.map((file) => `- ${file}`).join('\n') : 'None',
       '',
       '## Tool Results',
-      iterationResult.toolSummaries.length
-        ? iterationResult.toolSummaries
+      toolSummaries.length
+        ? toolSummaries
             .map((tool) => {
-              const status = tool.success === false ? 'failed' : 'ok';
+              const status =
+                tool.success === false ? 'failed' : tool.success === true ? 'passed' : 'unknown';
               return `- ${tool.toolName}${tool.command ? ` (${tool.command})` : ''}: ${status}`;
             })
             .join('\n')
         : 'None',
       '',
-      '## Errors',
-      evaluation.errors.length ? evaluation.errors.map((err) => `- ${err}`).join('\n') : 'None',
-      '',
       '## Last Output (truncated)',
-      this.truncateText(iterationResult.fullText, 1200),
-      feedback ? '## Feedback\n' + feedback : null,
+      this.truncateText(fullText, 1200),
     ].filter(Boolean) as string[];
 
-    // Append new iteration content to existing summary or create new summary
+    // Build summary content
     let summaryContent: string;
-    if (!summary || summary.trim().length === 0) {
+    if (!existingSummary || existingSummary.trim().length === 0) {
       // Create new summary with objective
       summaryContent = [
         '# Ralph Loop Summary',
@@ -687,11 +551,12 @@ export class RalphLoopService {
       ].join('\n');
     } else {
       // Append to existing summary
-      summaryContent = summary.trim() + newIterationContent.join('\n');
+      summaryContent = existingSummary.trim() + '\n' + newIterationContent.join('\n');
     }
 
     await taskFileService.writeFile('context', taskId, summaryFile, summaryContent);
 
+    // Update state file
     const state: RalphLoopStateFile = {
       taskId,
       startedAt: startTime,
@@ -700,26 +565,34 @@ export class RalphLoopService {
       stopReason: evaluation.stopReason,
       stopMessage: evaluation.stopMessage,
       completionPromiseMatched: evaluation.completionPromiseMatched,
-      errors: evaluation.errors,
+      errors: [],
     };
 
     await taskFileService.writeFile('context', taskId, stateFile, JSON.stringify(state, null, 2));
+
+    logger.info('[RalphLoop] Persisted iteration artifacts', {
+      taskId,
+      iteration,
+      stopReason: evaluation.stopReason,
+    });
   }
 
+  /**
+   * Persist final state when loop stops
+   */
   private async persistFinalState(params: {
     taskId: string;
     iteration: number;
     startTime: number;
-    summaryFile: string;
-    stateFile: string;
     stopReason: RalphLoopStopReason;
     stopMessage?: string;
   }): Promise<void> {
-    const { taskId, iteration, startTime, summaryFile, stateFile, stopReason, stopMessage } =
-      params;
+    const { taskId, iteration, startTime, stopReason, stopMessage } = params;
 
-    const summary = await taskFileService.readFile('context', taskId, summaryFile);
+    const summaryFile = DEFAULT_CONFIG.memory.summaryFileName;
+    const stateFile = DEFAULT_CONFIG.memory.stateFileName;
 
+    // Update state file
     const state: RalphLoopStateFile = {
       taskId,
       startedAt: startTime,
@@ -733,6 +606,8 @@ export class RalphLoopService {
 
     await taskFileService.writeFile('context', taskId, stateFile, JSON.stringify(state, null, 2));
 
+    // Ensure summary exists
+    const summary = await taskFileService.readFile('context', taskId, summaryFile);
     if (!summary) {
       await taskFileService.writeFile(
         'context',
@@ -741,12 +616,22 @@ export class RalphLoopService {
         `# Ralph Loop Summary\n\nStop reason: ${stopReason}`
       );
     }
+
+    logger.info('[RalphLoop] Persisted final state', {
+      taskId,
+      iteration,
+      stopReason,
+    });
   }
 
+  /**
+   * Truncate text to max length
+   */
   private truncateText(text: string, maxLength: number): string {
     if (text.length <= maxLength) return text;
     return `${text.slice(0, maxLength)}...`;
   }
 }
 
+// Singleton instance
 export const ralphLoopService = new RalphLoopService();

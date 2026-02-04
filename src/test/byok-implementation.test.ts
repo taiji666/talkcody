@@ -16,7 +16,6 @@ const mockModelService = {
     google: {},
     anthropic: {},
     aiGateway: {},
-    qwen: {},
     openRouter: {},
   })),
 };
@@ -251,7 +250,6 @@ describe('BYOK Implementation', () => {
       expect(providers).toHaveProperty('google');
       expect(providers).toHaveProperty('anthropic');
       expect(providers).toHaveProperty('aiGateway');
-      expect(providers).toHaveProperty('qwen');
       expect(providers).toHaveProperty('openRouter');
 
       // Provider objects should exist but no longer have priority property

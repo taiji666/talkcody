@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { ClaudeOAuthLogin } from '@/components/settings/claude-oauth-login';
 import { GitHubCopilotOAuthLogin } from '@/components/settings/github-copilot-oauth-login';
 import { OpenAIOAuthLogin } from '@/components/settings/openai-oauth-login';
-import { QwenCodeOAuthLogin } from '@/components/settings/qwen-code-oauth-login';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
@@ -21,7 +20,6 @@ import type { ProviderDefinition } from '@/types';
 const OAUTH_COMPONENTS: Record<string, React.ComponentType> = {
   anthropic: ClaudeOAuthLogin,
   openai: OpenAIOAuthLogin,
-  qwen_code: QwenCodeOAuthLogin,
   github_copilot: GitHubCopilotOAuthLogin,
 };
 
@@ -72,7 +70,7 @@ export function OAuthProviderInput({
   }
 
   // Providers that ONLY support OAuth (no API key fallback)
-  const oauthOnlyProviders = ['qwen_code', 'github_copilot'];
+  const oauthOnlyProviders = ['github_copilot'];
   const isOAuthOnly = oauthOnlyProviders.includes(providerId);
 
   return (

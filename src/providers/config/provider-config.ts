@@ -109,7 +109,7 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     apiKeyName: 'ANTHROPIC_API_KEY',
     required: false,
     type: 'custom',
-    supportsOAuth: false,
+    supportsOAuth: true,
   },
 
   lmstudio: {
@@ -149,16 +149,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     baseUrl: 'https://google.serper.dev',
     required: false,
     type: 'custom',
-  },
-
-  qwen_code: {
-    id: 'qwen_code',
-    name: 'Qwen Code',
-    apiKeyName: 'QWEN_API_KEY',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    required: false,
-    type: 'openai-compatible',
-    supportsOAuth: true, // Supports Qwen Code OAuth authentication
   },
 
   elevenlabs: {

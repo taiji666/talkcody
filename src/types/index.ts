@@ -57,6 +57,14 @@ export type {
   CommandType,
   ParsedCommand,
 } from './command';
+// Completion Hook types
+export type {
+  CompletionHook,
+  CompletionHookContext,
+  CompletionHookPipelineConfig,
+  CompletionHookResult,
+  ToolSummary,
+} from './completion-hooks';
 // Custom provider types
 export type {
   CustomProviderConfig,

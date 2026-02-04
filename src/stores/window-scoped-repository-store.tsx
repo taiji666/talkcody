@@ -105,6 +105,7 @@ function createRepositoryStore() {
     indexingProgress: null,
     indexedFiles: new Set<string>(),
     pendingExternalChange: null,
+    openRepositoryRequestId: 0,
 
     // Loading phase setter
     setLoadingPhase: (phase: LoadingPhase) => set({ loadingPhase: phase }),
@@ -192,11 +193,16 @@ function createRepositoryStore() {
       }
       // Note: We don't check isLoading here because selectRepository sets it before calling us
 
-      set({ isLoading: true, error: null });
+      const requestId = currentState.openRepositoryRequestId + 1;
+      set({ isLoading: true, error: null, openRepositoryRequestId: requestId });
       logger.info('[openRepository] Starting to build directory tree...');
 
       try {
         const fileTree = await repositoryService.buildDirectoryTree(path);
+        if (get().openRepositoryRequestId !== requestId) {
+          logger.info('[openRepository] Stale request ignored:', path);
+          return;
+        }
         logger.info(
           `[openRepository] Directory tree built successfully, root has ${fileTree?.children?.length || 0} children`
         );
@@ -227,6 +233,9 @@ function createRepositoryStore() {
         // Update window project info in backend
         try {
           const windowLabel = await WindowManagerService.getCurrentWindowLabel();
+          if (get().openRepositoryRequestId !== requestId) {
+            return;
+          }
           await WindowManagerService.updateWindowProject(windowLabel, projectId, path);
           logger.info('[openRepository] Window project info updated in backend');
         } catch (error) {
@@ -235,6 +244,9 @@ function createRepositoryStore() {
 
         // Save window state for restoration
         try {
+          if (get().openRepositoryRequestId !== requestId) {
+            return;
+          }
           await WindowRestoreService.saveCurrentWindowState(projectId, path);
           logger.info('[openRepository] Window state saved');
         } catch (error) {
@@ -245,9 +257,15 @@ function createRepositoryStore() {
         databaseService
           .getProject(projectId)
           .then((project) => {
+            if (get().openRepositoryRequestId !== requestId) {
+              return null;
+            }
             return databaseService.trackProjectOpened(projectId, project.name, path);
           })
           .then(async () => {
+            if (get().openRepositoryRequestId !== requestId) {
+              return;
+            }
             logger.info('[openRepository] Project tracked as recently opened');
             // Refresh dock menu to show updated recent projects list
             try {
@@ -262,6 +280,9 @@ function createRepositoryStore() {
             logger.error('Failed to track project opened:', error);
           });
       } catch (error) {
+        if (get().openRepositoryRequestId !== requestId) {
+          return;
+        }
         logger.error('[openRepository] Error occurred:', error);
         const errorMessage = (error as Error).message;
         set({
@@ -300,8 +321,8 @@ function createRepositoryStore() {
           });
 
         return project;
-      } catch (_error) {
-        // Error handling is done in openRepository
+      } catch (error) {
+        set({ isLoading: false, error: (error as Error).message });
         return null;
       }
     },
@@ -353,8 +374,8 @@ function createRepositoryStore() {
         const content = await repositoryService.readFileWithCache(filePath);
 
         set((state) => ({
-          openFiles: state.openFiles.map((file, index) =>
-            index === state.openFiles.length - 1 ? { ...file, content, isLoading: false } : file
+          openFiles: state.openFiles.map((file) =>
+            file.path === filePath ? { ...file, content, isLoading: false, error: null } : file
           ),
           isLoading: false,
         }));
@@ -369,10 +390,8 @@ function createRepositoryStore() {
       } catch (error) {
         const errorMessage = (error as Error).message;
         set((state) => ({
-          openFiles: state.openFiles.map((file, index) =>
-            index === state.openFiles.length - 1
-              ? { ...file, error: errorMessage, isLoading: false }
-              : file
+          openFiles: state.openFiles.map((file) =>
+            file.path === filePath ? { ...file, error: errorMessage, isLoading: false } : file
           ),
           isLoading: false,
         }));
@@ -515,11 +534,27 @@ function createRepositoryStore() {
 
       try {
         await repositoryService.renameFile(oldPath, newName);
-        // If the renamed file is open, update its path
+        const newPath = oldPath.replace(/[^\\/]+$/, newName);
+        const normalizedOld = oldPath.replace(/\\/g, '/');
+        const normalizedNew = newPath.replace(/\\/g, '/');
+
+        // If the renamed file or directory is open, update its path
         set((state) => ({
-          openFiles: state.openFiles.map((file) =>
-            file.path === oldPath ? { ...file, path: oldPath.replace(/[^/]+$/, newName) } : file
-          ),
+          openFiles: state.openFiles.map((file) => {
+            const normalizedFile = file.path.replace(/\\/g, '/');
+            if (normalizedFile === normalizedOld) {
+              return { ...file, path: newPath };
+            }
+            if (normalizedFile.startsWith(`${normalizedOld}/`)) {
+              const suffix = normalizedFile.slice(normalizedOld.length);
+              const updated = `${normalizedNew}${suffix}`;
+              return {
+                ...file,
+                path: file.path.includes('\\') ? updated.replace(/\//g, '\\') : updated,
+              };
+            }
+            return file;
+          }),
         }));
         await refreshFileTree();
       } catch (error) {
@@ -633,14 +668,17 @@ function createRepositoryStore() {
 
       const expandedPaths = new Set(currentExpandedPaths);
 
+      const normalizedRootPath = rootPath.replace(/\\/g, '/');
+      const normalizedFilePath = filePath.replace(/\\/g, '/');
+
       // Get relative path from root
-      const relativePath = filePath.startsWith(rootPath)
-        ? filePath.substring(rootPath.length + 1)
-        : filePath;
+      const relativePath = normalizedFilePath.startsWith(`${normalizedRootPath}/`)
+        ? normalizedFilePath.substring(normalizedRootPath.length + 1)
+        : normalizedFilePath;
 
       // Build all parent paths that need to be expanded
-      const parts = relativePath.split('/');
-      let currentPath = rootPath;
+      const parts = relativePath.split('/').filter(Boolean);
+      let currentPath = normalizedRootPath;
       const pathsToExpand: string[] = [];
 
       for (let i = 0; i < parts.length - 1; i++) {

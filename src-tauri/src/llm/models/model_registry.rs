@@ -2,6 +2,7 @@ use crate::llm::auth::api_key_manager::ApiKeyManager;
 use crate::llm::providers::provider_registry::ProviderRegistry;
 use crate::llm::types::{AvailableModel, CustomProvidersConfiguration, ModelsConfiguration};
 use std::collections::HashMap;
+#[cfg(test)]
 use std::sync::Arc;
 
 pub struct ModelRegistry;
@@ -17,6 +18,8 @@ impl ModelRegistry {
 
     /// Load models configuration from raw JSON string using spawn_blocking
     /// to avoid blocking the async runtime during JSON parsing
+    #[allow(dead_code)]
+    #[cfg(test)]
     async fn parse_models_config(raw: String) -> Result<ModelsConfiguration, String> {
         let raw = Arc::new(raw);
         let result = tokio::task::spawn_blocking(move || {
@@ -29,6 +32,8 @@ impl ModelRegistry {
     }
 
     /// Load default models configuration using spawn_blocking for JSON parsing
+    #[allow(dead_code)]
+    #[cfg(test)]
     async fn load_default_models_config() -> Result<ModelsConfiguration, String> {
         let default_config =
             include_str!("../../../../packages/shared/src/data/models-config.json").to_string();
@@ -249,9 +254,18 @@ impl ModelRegistry {
                 );
                 return true;
             }
-            if api_keys.get(provider_id).is_some() {
-                log::debug!("[ModelRegistry] Provider {} has API key", provider_id);
+            if provider.auth_type == crate::llm::types::AuthType::TalkCodyJwt {
+                log::debug!(
+                    "[ModelRegistry] Provider {} is TalkCody JWT, available without credentials",
+                    provider_id
+                );
                 return true;
+            }
+            if let Some(value) = api_keys.get(provider_id) {
+                if !value.trim().is_empty() {
+                    log::debug!("[ModelRegistry] Provider {} has credentials", provider_id);
+                    return true;
+                }
             }
             if provider.supports_oauth {
                 if let Some(token) = api_keys.get(provider_id) {
@@ -455,6 +469,31 @@ mod tests {
         );
         assert!(available.iter().any(|model| model.provider == "openai"));
         assert!(available.iter().any(|model| model.provider == "custom"));
+    }
+
+    #[test]
+    fn compute_available_models_includes_talkcody_without_token() {
+        let mut config = build_models_config();
+        if let Some(model_cfg) = config.models.get_mut("gpt-4o") {
+            model_cfg.providers.push("talkcody".to_string());
+        }
+        let registry = ProviderRegistry::new(vec![
+            provider_config("openai", crate::llm::types::AuthType::Bearer),
+            provider_config("talkcody", crate::llm::types::AuthType::TalkCodyJwt),
+        ]);
+        let api_keys = HashMap::new();
+        let custom_providers = CustomProvidersConfiguration {
+            version: "1".to_string(),
+            providers: HashMap::new(),
+        };
+
+        let available = ModelRegistry::compute_available_models_internal(
+            &config,
+            &api_keys,
+            &registry,
+            &custom_providers,
+        );
+        assert!(available.iter().any(|model| model.provider == "talkcody"));
     }
 
     #[test]

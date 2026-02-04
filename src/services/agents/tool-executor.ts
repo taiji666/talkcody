@@ -167,11 +167,15 @@ export class ToolExecutor {
   /**
    * Execute tool calls with smart concurrency analysis
    * This method automatically analyzes dependencies and maximizes parallelism
+   *
+   * @param onToolResult Optional callback invoked with structured tool results
+   *                     for completion hook evaluation
    */
   async executeWithSmartConcurrency(
     toolCalls: ToolCallInfo[],
     options: ToolExecutionOptions,
-    onStatus?: (status: string) => void
+    onStatus?: (status: string) => void,
+    onToolResult?: (toolName: string, result: unknown, toolCallId: string) => void
   ): Promise<Array<{ toolCall: ToolCallInfo; result: unknown }>> {
     // Generate execution plan using dependency analyzer
     const plan = await this.dependencyAnalyzer.analyzeDependencies(toolCalls, options.tools);
@@ -182,7 +186,7 @@ export class ToolExecutor {
     for (const stage of stages) {
       onStatus?.(`${stage.description}`);
 
-      const stageResults = await this.executeStage(stage, options, onStatus);
+      const stageResults = await this.executeStage(stage, options, onStatus, onToolResult);
       allResults.push(...stageResults);
 
       // Check for abort signal between stages
@@ -211,13 +215,14 @@ export class ToolExecutor {
   private async executeStage(
     stage: ExecutionStage | AgentExecutionStage,
     options: ToolExecutionOptions,
-    onStatus?: (status: string) => void
+    onStatus?: (status: string) => void,
+    onToolResult?: (toolName: string, result: unknown, toolCallId: string) => void
   ): Promise<Array<{ toolCall: ToolCallInfo; result: unknown }>> {
     const results: Array<{ toolCall: ToolCallInfo; result: unknown }> = [];
 
     // Execute all groups in this stage sequentially
     for (const group of stage.groups) {
-      const groupResults = await this.executeToolGroup(group, options, onStatus);
+      const groupResults = await this.executeToolGroup(group, options, onStatus, onToolResult);
 
       results.push(...groupResults);
 
@@ -502,16 +507,17 @@ export class ToolExecutor {
   private async executeToolGroup(
     group: ExecutionGroup | AgentExecutionGroup,
     options: ToolExecutionOptions,
-    onStatus?: (status: string) => void
+    onStatus?: (status: string) => void,
+    onToolResult?: (toolName: string, result: unknown, toolCallId: string) => void
   ): Promise<Array<{ toolCall: ToolCallInfo; result: unknown }>> {
     // Extract tools from either ExecutionGroup or AgentExecutionGroup
     const tools = this.getToolsFromGroup(group);
     const maxConcurrency = this.getMaxConcurrencyFromGroup(group);
 
     if (group.concurrent && tools.length > 1) {
-      return this.executeConcurrentTools(tools, options, onStatus, maxConcurrency);
+      return this.executeConcurrentTools(tools, options, onStatus, maxConcurrency, onToolResult);
     } else {
-      return this.executeSequentialTools(tools, options, onStatus);
+      return this.executeSequentialTools(tools, options, onStatus, onToolResult);
     }
   }
 
@@ -546,7 +552,8 @@ export class ToolExecutor {
     toolCalls: ToolCallInfo[],
     options: ToolExecutionOptions,
     onStatus?: (status: string) => void,
-    maxConcurrency?: number
+    maxConcurrency?: number,
+    onToolResult?: (toolName: string, result: unknown, toolCallId: string) => void
   ): Promise<Array<{ toolCall: ToolCallInfo; result: unknown }>> {
     const effectiveLimit =
       typeof maxConcurrency === 'number' && maxConcurrency > 0
@@ -570,10 +577,15 @@ export class ToolExecutor {
 
       const batch = toolCalls.slice(i, i + effectiveLimit);
       const batchResults = await Promise.all(
-        batch.map(async (toolCall) => ({
-          toolCall,
-          result: await this.executeToolCall(toolCall, options),
-        }))
+        batch.map(async (toolCall) => {
+          const result = await this.executeToolCall(toolCall, options);
+          // Notify callback with structured result
+          onToolResult?.(toolCall.toolName, result, toolCall.toolCallId);
+          return {
+            toolCall,
+            result,
+          };
+        })
       );
       results.push(...batchResults);
 
@@ -596,7 +608,8 @@ export class ToolExecutor {
   private async executeSequentialTools(
     toolCalls: ToolCallInfo[],
     options: ToolExecutionOptions,
-    onStatus?: (status: string) => void
+    onStatus?: (status: string) => void,
+    onToolResult?: (toolName: string, result: unknown, toolCallId: string) => void
   ): Promise<Array<{ toolCall: ToolCallInfo; result: unknown }>> {
     // logger.info(`Executing ${toolCalls.length} tools sequentially`, {
     //   toolCallIds: toolCalls.map((tool) => tool.toolCallId),
@@ -616,6 +629,8 @@ export class ToolExecutor {
       const toolLabel = getToolLabel(toolCall.toolName);
       onStatus?.(`Processing tool ${toolLabel}`);
       const result = await this.executeToolCall(toolCall, options);
+      // Notify callback with structured result
+      onToolResult?.(toolCall.toolName, result, toolCall.toolCallId);
       results.push({ toolCall, result });
     }
 

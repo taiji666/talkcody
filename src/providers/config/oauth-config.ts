@@ -32,10 +32,6 @@ export const OAUTH_PROVIDERS_MAP: Record<string, OAuthProviderMetadata> = {
     providerId: 'openai',
     tokenKey: 'openaiIsConnected',
   },
-  qwen_code: {
-    providerId: 'qwen_code',
-    tokenKey: 'qwenIsConnected',
-  },
   github_copilot: {
     providerId: 'github_copilot',
     tokenKey: 'githubCopilotIsConnected',
@@ -60,16 +56,4 @@ export function isOAuthConnected(providerId: string, oauthConfig?: OAuthConfig):
   }
 
   return !!oauthConfig[metadata.tokenKey];
-}
-
-/**
- * @deprecated Use isOAuthConnected instead. Tokens are now managed by the Rust backend.
- * Kept for backward compatibility with existing code.
- */
-export function getOAuthToken(
-  _providerId: string,
-  _oauthConfig?: OAuthConfig
-): string | null | undefined {
-  // Tokens are now managed internally by the Rust backend
-  return undefined;
 }

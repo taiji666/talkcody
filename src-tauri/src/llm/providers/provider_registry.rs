@@ -9,7 +9,9 @@ use std::collections::HashMap;
 pub struct ProviderRegistry {
     providers: HashMap<String, ProviderConfig>,
     // Protocol implementations (kept for backward compatibility during migration)
+    #[allow(dead_code)]
     openai_protocol: OpenAiProtocol,
+    #[allow(dead_code)]
     claude_protocol: ClaudeProtocol,
 }
 
@@ -67,7 +69,8 @@ impl ProviderRegistry {
     }
 
     /// Legacy method - kept for backward compatibility
-    pub fn protocol(&self, protocol: ProtocolType) -> Option<LegacyProtocolAdapter> {
+    #[allow(dead_code)]
+    pub fn protocol(&self, protocol: ProtocolType) -> Option<LegacyProtocolAdapter<'_>> {
         match protocol {
             ProtocolType::OpenAiCompatible => {
                 Some(LegacyProtocolAdapter::new(&self.openai_protocol))
@@ -79,22 +82,27 @@ impl ProviderRegistry {
 
 /// Adapter for backward compatibility with old protocol system
 pub struct LegacyProtocolAdapter<'a> {
+    #[allow(dead_code)]
     protocol: &'a dyn crate::llm::protocols::LlmProtocol,
 }
 
 impl<'a> LegacyProtocolAdapter<'a> {
+    #[allow(dead_code)]
     pub fn new(protocol: &'a dyn crate::llm::protocols::LlmProtocol) -> Self {
         Self { protocol }
     }
 
+    #[allow(dead_code)]
     pub fn name(&self) -> &str {
         self.protocol.name()
     }
 
+    #[allow(dead_code)]
     pub fn endpoint_path(&self) -> &'static str {
         self.protocol.endpoint_path()
     }
 
+    #[allow(dead_code)]
     pub fn build_request(
         &self,
         model: &str,
@@ -120,6 +128,7 @@ impl<'a> LegacyProtocolAdapter<'a> {
         )
     }
 
+    #[allow(dead_code)]
     pub fn parse_stream_event(
         &self,
         event_type: Option<&str>,
@@ -129,6 +138,7 @@ impl<'a> LegacyProtocolAdapter<'a> {
         self.protocol.parse_stream_event(event_type, data, state)
     }
 
+    #[allow(dead_code)]
     pub fn build_headers(
         &self,
         api_key: Option<&str>,

@@ -1,5 +1,4 @@
 use crate::llm::protocols::{
-    self,
     header_builder::{HeaderBuildContext, ProtocolHeaderBuilder},
     request_builder::{ProtocolRequestBuilder, RequestBuildContext},
     stream_parser::{self, ProtocolStreamParser, StreamParseContext, StreamParseState},
@@ -721,14 +720,10 @@ mod tests {
         });
 
         // Parse first reasoning chunk - ReasoningStart is emitted first (no TextStart for reasoning-only)
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &first.to_string(),
-            &mut state,
-        )
-        .expect("parse first")
-        .expect("event");
+        let event =
+            LlmProtocol::parse_stream_event(&protocol, None, &first.to_string(), &mut state)
+                .expect("parse first")
+                .expect("event");
 
         match event {
             StreamEvent::ReasoningStart { .. } => {
@@ -748,14 +743,10 @@ mod tests {
         }
 
         // Parse second reasoning chunk
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &second.to_string(),
-            &mut state,
-        )
-        .expect("parse second")
-        .expect("event");
+        let event =
+            LlmProtocol::parse_stream_event(&protocol, None, &second.to_string(), &mut state)
+                .expect("parse second")
+                .expect("event");
 
         match event {
             StreamEvent::ReasoningDelta { text, .. } => {
@@ -765,14 +756,9 @@ mod tests {
         }
 
         // Parse done - should emit ReasoningEnd
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &done.to_string(),
-            &mut state,
-        )
-        .expect("parse done")
-        .expect("event");
+        let event = LlmProtocol::parse_stream_event(&protocol, None, &done.to_string(), &mut state)
+            .expect("parse done")
+            .expect("event");
 
         match event {
             StreamEvent::ReasoningEnd { .. } => {
@@ -795,13 +781,9 @@ mod tests {
             }]
         });
 
-        let result = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &data.to_string(),
-            &mut state,
-        )
-        .expect("parse");
+        let result =
+            LlmProtocol::parse_stream_event(&protocol, None, &data.to_string(), &mut state)
+                .expect("parse");
 
         // Empty reasoning_content with no text content should not emit any event
         assert!(
@@ -851,14 +833,10 @@ mod tests {
         });
 
         // Parse first reasoning chunk - should emit ReasoningStart
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &first.to_string(),
-            &mut state,
-        )
-        .expect("parse first")
-        .expect("event");
+        let event =
+            LlmProtocol::parse_stream_event(&protocol, None, &first.to_string(), &mut state)
+                .expect("parse first")
+                .expect("event");
 
         match event {
             StreamEvent::ReasoningStart { .. } => {
@@ -878,14 +856,10 @@ mod tests {
         }
 
         // Parse second reasoning chunk
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &second.to_string(),
-            &mut state,
-        )
-        .expect("parse second")
-        .expect("event");
+        let event =
+            LlmProtocol::parse_stream_event(&protocol, None, &second.to_string(), &mut state)
+                .expect("parse second")
+                .expect("event");
 
         match event {
             StreamEvent::ReasoningDelta { text, .. } => {
@@ -895,14 +869,10 @@ mod tests {
         }
 
         // Parse third reasoning chunk
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &third.to_string(),
-            &mut state,
-        )
-        .expect("parse third")
-        .expect("event");
+        let event =
+            LlmProtocol::parse_stream_event(&protocol, None, &third.to_string(), &mut state)
+                .expect("parse third")
+                .expect("event");
 
         match event {
             StreamEvent::ReasoningDelta { text, .. } => {
@@ -912,14 +882,9 @@ mod tests {
         }
 
         // Parse done - should emit ReasoningEnd
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &done.to_string(),
-            &mut state,
-        )
-        .expect("parse done")
-        .expect("event");
+        let event = LlmProtocol::parse_stream_event(&protocol, None, &done.to_string(), &mut state)
+            .expect("parse done")
+            .expect("event");
 
         match event {
             StreamEvent::ReasoningEnd { .. } => {
@@ -944,13 +909,9 @@ mod tests {
             }]
         });
 
-        let result = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &data.to_string(),
-            &mut state,
-        )
-        .expect("parse");
+        let result =
+            LlmProtocol::parse_stream_event(&protocol, None, &data.to_string(), &mut state)
+                .expect("parse");
 
         // Empty reasoning with no text content should not emit any event
         assert!(
@@ -985,13 +946,9 @@ mod tests {
 
         // Process all events
         let mut events = Vec::new();
-        if let Some(event) = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &data.to_string(),
-            &mut state,
-        )
-        .expect("parse")
+        if let Some(event) =
+            LlmProtocol::parse_stream_event(&protocol, None, &data.to_string(), &mut state)
+                .expect("parse")
         {
             events.push(event);
         }
@@ -1038,14 +995,9 @@ mod tests {
             }]
         });
 
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &data.to_string(),
-            &mut state,
-        )
-        .expect("parse")
-        .expect("event");
+        let event = LlmProtocol::parse_stream_event(&protocol, None, &data.to_string(), &mut state)
+            .expect("parse")
+            .expect("event");
 
         match event {
             StreamEvent::ReasoningStart { .. } => {}
@@ -1078,13 +1030,9 @@ mod tests {
 
         // Process all events
         let mut events = Vec::new();
-        if let Some(event) = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &data.to_string(),
-            &mut state,
-        )
-        .expect("parse")
+        if let Some(event) =
+            LlmProtocol::parse_stream_event(&protocol, None, &data.to_string(), &mut state)
+                .expect("parse")
         {
             events.push(event);
         }
@@ -1162,7 +1110,7 @@ mod tests {
             provider_options: None,
         }];
 
-        let body = protocols::LlmProtocol::build_request(
+        let body = LlmProtocol::build_request(
             &protocol,
             "gpt-4o",
             &messages,
@@ -1193,7 +1141,7 @@ mod tests {
             provider_options: None,
         }];
 
-        let body = protocols::LlmProtocol::build_request(
+        let body = LlmProtocol::build_request(
             &protocol,
             "minimax-m2.1",
             &messages,
@@ -1243,29 +1191,14 @@ mod tests {
             "choices": [{ "finish_reason": "tool_calls", "delta": {} }]
         });
 
-        let _ = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &first.to_string(),
-            &mut state,
-        )
-        .expect("parse first");
-        let _ = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &second.to_string(),
-            &mut state,
-        )
-        .expect("parse second");
+        let _ = LlmProtocol::parse_stream_event(&protocol, None, &first.to_string(), &mut state)
+            .expect("parse first");
+        let _ = LlmProtocol::parse_stream_event(&protocol, None, &second.to_string(), &mut state)
+            .expect("parse second");
         state.text_started = true;
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &done.to_string(),
-            &mut state,
-        )
-        .expect("parse done")
-        .expect("event");
+        let event = LlmProtocol::parse_stream_event(&protocol, None, &done.to_string(), &mut state)
+            .expect("parse done")
+            .expect("event");
 
         match event {
             StreamEvent::ToolCall {
@@ -1316,13 +1249,9 @@ mod tests {
 
         let mut events: Vec<StreamEvent> = Vec::new();
 
-        let parsed = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &first.to_string(),
-            &mut state,
-        )
-        .expect("parse first");
+        let parsed =
+            LlmProtocol::parse_stream_event(&protocol, None, &first.to_string(), &mut state)
+                .expect("parse first");
         if let Some(event) = parsed {
             events.push(event);
         }
@@ -1331,13 +1260,9 @@ mod tests {
             events.push(pending);
         }
 
-        let parsed = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &second.to_string(),
-            &mut state,
-        )
-        .expect("parse second");
+        let parsed =
+            LlmProtocol::parse_stream_event(&protocol, None, &second.to_string(), &mut state)
+                .expect("parse second");
         if let Some(event) = parsed {
             events.push(event);
         }
@@ -1347,13 +1272,9 @@ mod tests {
         }
 
         state.text_started = true;
-        let parsed = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &done.to_string(),
-            &mut state,
-        )
-        .expect("parse done");
+        let parsed =
+            LlmProtocol::parse_stream_event(&protocol, None, &done.to_string(), &mut state)
+                .expect("parse done");
         if let Some(event) = parsed {
             events.push(event);
         }
@@ -1413,22 +1334,12 @@ mod tests {
             "choices": [{ "finish_reason": "tool_calls", "delta": {} }]
         });
 
-        let _ = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &first.to_string(),
-            &mut state,
-        )
-        .expect("parse first");
+        let _ = LlmProtocol::parse_stream_event(&protocol, None, &first.to_string(), &mut state)
+            .expect("parse first");
         state.text_started = true;
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &done.to_string(),
-            &mut state,
-        )
-        .expect("parse done")
-        .expect("event");
+        let event = LlmProtocol::parse_stream_event(&protocol, None, &done.to_string(), &mut state)
+            .expect("parse done")
+            .expect("event");
 
         match event {
             StreamEvent::ToolCall {
@@ -1476,22 +1387,12 @@ mod tests {
             "choices": [{ "finish_reason": "tool_calls", "delta": {} }]
         });
 
-        let _ = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &first.to_string(),
-            &mut state,
-        )
-        .expect("parse first");
+        let _ = LlmProtocol::parse_stream_event(&protocol, None, &first.to_string(), &mut state)
+            .expect("parse first");
         state.text_started = true;
-        let event = protocols::LlmProtocol::parse_stream_event(
-            &protocol,
-            None,
-            &done.to_string(),
-            &mut state,
-        )
-        .expect("parse done")
-        .expect("event");
+        let event = LlmProtocol::parse_stream_event(&protocol, None, &done.to_string(), &mut state)
+            .expect("parse done")
+            .expect("event");
 
         match event {
             StreamEvent::ToolCall {

@@ -259,7 +259,7 @@ impl ApiKeyManager {
                 Ok(token) => Ok(Some(token)),
                 Err(_) => self.get_setting(GITHUB_COPILOT_COPILOT_TOKEN_KEY).await,
             },
-            "qwen_code" => Ok(None),
+
             _ => Ok(None),
         }
     }

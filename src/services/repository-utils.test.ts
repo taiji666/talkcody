@@ -10,7 +10,7 @@ vi.mock('@tauri-apps/api/path', () => ({
 vi.unmock('./repository-utils');
 
 import { join, normalize } from '@tauri-apps/api/path';
-import { normalizeFilePath } from './repository-utils';
+import { getFileNameFromPath, getRelativePath, normalizeFilePath } from './repository-utils';
 
 const mockJoin = vi.mocked(join);
 const mockNormalize = vi.mocked(normalize);
@@ -21,6 +21,36 @@ describe('normalizeFilePath', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+describe('getFileNameFromPath', () => {
+  it('should handle Windows paths', () => {
+    expect(getFileNameFromPath('C:\\Users\\dev\\file.ts')).toBe('file.ts');
+  });
+
+  it('should handle trailing separators', () => {
+    expect(getFileNameFromPath('C:\\Users\\dev\\repo\\')).toBe('repo');
+  });
+
+  it('should handle mixed separators', () => {
+    expect(getFileNameFromPath('C:/Users/dev\\repo/file.ts')).toBe('file.ts');
+  });
+});
+
+describe('getRelativePath', () => {
+  it('should return relative path for Windows-style root and file', () => {
+    const rootPath = 'C:\\Users\\dev\\repo';
+    const filePath = 'C:\\Users\\dev\\repo\\src\\index.ts';
+
+    expect(getRelativePath(filePath, rootPath)).toBe('src/index.ts');
+  });
+
+  it('should return original path when root does not match', () => {
+    const rootPath = 'C:\\Users\\dev\\repo';
+    const filePath = 'D:\\Work\\other\\file.ts';
+
+    expect(getRelativePath(filePath, rootPath)).toBe(filePath);
+  });
+});
 
   it('should return normalized path for absolute Unix paths', async () => {
     const filePath = '/Users/test/file.txt';
@@ -40,6 +70,39 @@ describe('normalizeFilePath', () => {
     const result = await normalizeFilePath(rootPath, filePath);
 
     expect(result).toBe('C:\\Users\\test\\file.txt');
+    expect(mockNormalize).toHaveBeenCalledWith(filePath);
+    expect(mockJoin).not.toHaveBeenCalled();
+  });
+
+  it('should treat UNC paths as absolute', async () => {
+    const filePath = '\\\\server\\share\\file.txt';
+    mockNormalize.mockResolvedValueOnce('\\\\server\\share\\file.txt');
+
+    const result = await normalizeFilePath(rootPath, filePath);
+
+    expect(result).toBe('\\\\server\\share\\file.txt');
+    expect(mockNormalize).toHaveBeenCalledWith(filePath);
+    expect(mockJoin).not.toHaveBeenCalled();
+  });
+
+  it('should treat extended Windows paths as absolute', async () => {
+    const filePath = '\\\\?\\C:\\Users\\test\\file.txt';
+    mockNormalize.mockResolvedValueOnce('\\\\?\\C:\\Users\\test\\file.txt');
+
+    const result = await normalizeFilePath(rootPath, filePath);
+
+    expect(result).toBe('\\\\?\\C:\\Users\\test\\file.txt');
+    expect(mockNormalize).toHaveBeenCalledWith(filePath);
+    expect(mockJoin).not.toHaveBeenCalled();
+  });
+
+  it('should treat extended UNC paths as absolute', async () => {
+    const filePath = '\\\\?\\UNC\\server\\share\\file.txt';
+    mockNormalize.mockResolvedValueOnce('\\\\?\\UNC\\server\\share\\file.txt');
+
+    const result = await normalizeFilePath(rootPath, filePath);
+
+    expect(result).toBe('\\\\?\\UNC\\server\\share\\file.txt');
     expect(mockNormalize).toHaveBeenCalledWith(filePath);
     expect(mockJoin).not.toHaveBeenCalled();
   });

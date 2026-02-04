@@ -51,4 +51,5 @@ export interface RepositoryState {
   loadingPhase: LoadingPhase;
   indexingProgress: IndexingProgress | null;
   pendingExternalChange: PendingExternalChange | null;
+  openRepositoryRequestId: number;
 }

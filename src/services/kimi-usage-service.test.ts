@@ -1,7 +1,7 @@
 // src/services/kimi-usage-service.test.ts
 // Tests for Kimi usage service
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   parseCurlCommand,
   fetchKimiUsage,
@@ -247,26 +247,37 @@ describe('Kimi Usage Service', () => {
   });
 
   describe('getTimeUntilReset', () => {
+    const baseTime = new Date('2026-02-02T00:00:00.000Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(baseTime);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should return days and hours for distant reset', () => {
-      const future = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000); // 2d 3h
+      const future = new Date(baseTime.getTime() + 2 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000); // 2d 3h
       const result = getTimeUntilReset(future.toISOString());
       expect(result).toMatch(/2d 3h/);
     });
 
     it('should return hours and minutes for near reset', () => {
-      const future = new Date(Date.now() + 2 * 60 * 60 * 1000 + 30 * 60 * 1000); // 2h 30m
+      const future = new Date(baseTime.getTime() + 2 * 60 * 60 * 1000 + 30 * 60 * 1000); // 2h 30m
       const result = getTimeUntilReset(future.toISOString());
       expect(result).toMatch(/2h 30m/);
     });
 
     it('should return minutes for very near reset', () => {
-      const future = new Date(Date.now() + 45 * 60 * 1000); // 45m
+      const future = new Date(baseTime.getTime() + 45 * 60 * 1000); // 45m
       const result = getTimeUntilReset(future.toISOString());
       expect(result).toMatch(/45m/);
     });
 
     it('should return "Resetting soon" for past reset time', () => {
-      const past = new Date(Date.now() - 60 * 1000); // 1 minute ago
+      const past = new Date(baseTime.getTime() - 60 * 1000); // 1 minute ago
       const result = getTimeUntilReset(past.toISOString());
       expect(result).toBe('Resetting soon...');
     });

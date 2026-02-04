@@ -1080,8 +1080,6 @@ pub struct OAuthStatusResponse {
     pub anthropic: Option<OAuthProviderStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub github_copilot: Option<OAuthProviderStatus>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub qwen: Option<OAuthProviderStatus>,
 }
 
 #[tauri::command]
@@ -1157,31 +1155,10 @@ pub async fn llm_oauth_status(state: State<'_, LlmState>) -> Result<OAuthStatusR
         None
     };
 
-    // Qwen status - only return metadata
-    let qwen_access = api_keys
-        .get_setting("qwen_oauth_access_token")
-        .await?
-        .filter(|s| !s.is_empty());
-    let qwen_token_path = api_keys
-        .get_setting("qwen_token_path")
-        .await?
-        .filter(|s| !s.is_empty());
-
-    let qwen_is_connected = qwen_access.is_some() || qwen_token_path.is_some();
-    let qwen = if qwen_is_connected {
-        Some(OAuthProviderStatus {
-            is_connected: Some(true),
-            ..Default::default()
-        })
-    } else {
-        None
-    };
-
     Ok(OAuthStatusResponse {
         openai,
         anthropic,
         github_copilot,
-        qwen,
     })
 }
 

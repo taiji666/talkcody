@@ -1,10 +1,4 @@
-use crate::llm::protocols::{
-    self,
-    header_builder::{HeaderBuildContext, ProtocolHeaderBuilder},
-    request_builder::{ProtocolRequestBuilder, RequestBuildContext},
-    stream_parser::{ProtocolStreamParser, StreamParseContext, StreamParseState},
-    LlmProtocol, ProtocolStreamState, ToolCallAccum,
-};
+use crate::llm::protocols::{LlmProtocol, ProtocolStreamState, ToolCallAccum};
 use crate::llm::types::{ContentPart, Message, MessageContent, StreamEvent, ToolDefinition};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -12,6 +6,7 @@ use std::collections::HashMap;
 pub struct ClaudeProtocol;
 
 impl ClaudeProtocol {
+    #[allow(dead_code)]
     fn build_messages(&self, messages: &[Message]) -> Vec<Value> {
         let mut result = Vec::new();
         for msg in messages {
@@ -58,6 +53,7 @@ impl ClaudeProtocol {
         result
     }
 
+    #[allow(dead_code)]
     fn convert_content(&self, content: &MessageContent) -> Value {
         match content {
             MessageContent::Text(text) => json!([{"type": "text", "text": text }]),
@@ -113,6 +109,7 @@ impl ClaudeProtocol {
         }
     }
 
+    #[allow(dead_code)]
     fn tool_output_to_string(&self, output: &Value) -> String {
         if let Some(value) = output.get("value").and_then(|v| v.as_str()) {
             return value.to_string();
@@ -120,6 +117,7 @@ impl ClaudeProtocol {
         output.to_string()
     }
 
+    #[allow(dead_code)]
     fn build_tools(&self, tools: Option<&[ToolDefinition]>) -> Option<Vec<Value>> {
         let tools = tools?;
         let mut result = Vec::new();
@@ -443,7 +441,7 @@ mod tests {
                 "input": {}
             }
         });
-        let start_event = protocols::LlmProtocol::parse_stream_event(
+        let start_event = LlmProtocol::parse_stream_event(
             &protocol,
             Some("content_block_start"),
             &start.to_string(),
@@ -460,7 +458,7 @@ mod tests {
                 "partial_json": "{\"path\":\"/tmp\",\"pattern\":\"**/*.rs\"}"
             }
         });
-        let delta_event = protocols::LlmProtocol::parse_stream_event(
+        let delta_event = LlmProtocol::parse_stream_event(
             &protocol,
             Some("content_block_delta"),
             &delta.to_string(),
@@ -473,7 +471,7 @@ mod tests {
             "type": "content_block_stop",
             "index": 4
         });
-        let stop_event = protocols::LlmProtocol::parse_stream_event(
+        let stop_event = LlmProtocol::parse_stream_event(
             &protocol,
             Some("content_block_stop"),
             &stop.to_string(),
@@ -514,7 +512,7 @@ mod tests {
             },
         ];
 
-        let body = protocols::LlmProtocol::build_request(
+        let body = LlmProtocol::build_request(
             &protocol,
             "claude-3",
             &messages,
@@ -562,7 +560,7 @@ mod tests {
                 "id": "think-1"
             }
         });
-        let _ = protocols::LlmProtocol::parse_stream_event(
+        let _ = LlmProtocol::parse_stream_event(
             &protocol,
             Some("content_block_start"),
             &start.to_string(),
@@ -579,7 +577,7 @@ mod tests {
             }
         });
 
-        let event = protocols::LlmProtocol::parse_stream_event(
+        let event = LlmProtocol::parse_stream_event(
             &protocol,
             Some("content_block_delta"),
             &delta.to_string(),

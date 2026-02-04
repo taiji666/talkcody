@@ -201,7 +201,7 @@ async function loadOAuthConfig(): Promise<OAuthConfig> {
       anthropicIsConnected: snapshot?.anthropic?.isConnected || false,
       openaiIsConnected: snapshot?.openai?.isConnected || false,
       openaiAccountId: snapshot?.openai?.accountId || null,
-      qwenIsConnected: snapshot?.qwen?.isConnected || false,
+
       githubCopilotIsConnected: snapshot?.githubCopilot?.isConnected || false,
     };
   } catch (error) {
