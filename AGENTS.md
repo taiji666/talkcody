@@ -138,6 +138,12 @@ TalkCody runtime log path:
 ~/Library/Logs/com.talkcody/talkcody.log
 ```
 
+The log in macOS dev env:
+
+```
+~/Library/Logs/com.com.talkcody.dev/TalkCody\ Dev.log
+```
+
 ### App data directory
 
 TalkCody app data path:

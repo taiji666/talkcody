@@ -28,9 +28,11 @@ describe('settingsManager.get', () => {
   const createMockState = () => ({
     // Boolean values
     telegram_remote_enabled: true,
+    feishu_remote_enabled: false,
     is_think: false,
     // String values
     telegram_remote_token: 'test-token-123',
+    feishu_remote_app_id: 'app-id',
     language: 'en',
     // Empty string
     telegram_remote_allowed_chats: '',
@@ -84,6 +86,7 @@ describe('settingsManager.get', () => {
     };
 
     expect(getValue('telegram_remote_token')).toBe('test-token-123');
+    expect(getValue('feishu_remote_app_id')).toBe('app-id');
     expect(getValue('language')).toBe('en');
   });
 
@@ -148,6 +151,7 @@ describe('settingsManager.get', () => {
 describe('settingsManager.getBatch', () => {
   const createMockState = () => ({
     telegram_remote_enabled: true,
+    feishu_remote_enabled: false,
     telegram_remote_token: 'test-token',
     is_think: false,
   });
@@ -168,12 +172,14 @@ describe('settingsManager.getBatch', () => {
 
     const result = getBatch([
       'telegram_remote_enabled',
+      'feishu_remote_enabled',
       'telegram_remote_token',
       'is_think',
     ]);
 
     expect(result).toEqual({
       telegram_remote_enabled: 'true',
+      feishu_remote_enabled: 'false',
       telegram_remote_token: 'test-token',
       is_think: 'false',
     });

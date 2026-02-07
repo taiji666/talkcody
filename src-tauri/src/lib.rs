@@ -7,6 +7,7 @@ mod database;
 mod device_id;
 mod directory_tree;
 mod dock_menu;
+mod feishu_gateway;
 mod file_search;
 mod file_watcher;
 mod git;
@@ -760,6 +761,7 @@ pub fn run() {
         .manage(keep_awake::KeepAwakeStateWrapper::new())
         .manage(AnalyticsState::new())
         .manage(telegram_gateway::default_state())
+        .manage(feishu_gateway::default_state())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             if let Err(e) = app.emit("single-instance", Payload { args: argv, cwd }) {
@@ -1054,6 +1056,14 @@ pub fn run() {
             telegram_gateway::telegram_is_running,
             telegram_gateway::telegram_send_message,
             telegram_gateway::telegram_edit_message,
+            feishu_gateway::feishu_get_config,
+            feishu_gateway::feishu_set_config,
+            feishu_gateway::feishu_start,
+            feishu_gateway::feishu_stop,
+            feishu_gateway::feishu_get_status,
+            feishu_gateway::feishu_is_running,
+            feishu_gateway::feishu_send_message,
+            feishu_gateway::feishu_edit_message,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

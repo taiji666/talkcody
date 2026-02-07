@@ -48,6 +48,12 @@ interface SettingsState {
   telegram_remote_token: string;
   telegram_remote_allowed_chats: string;
   telegram_remote_poll_timeout: string;
+  feishu_remote_enabled: boolean;
+  feishu_remote_app_id: string;
+  feishu_remote_app_secret: string;
+  feishu_remote_encrypt_key: string;
+  feishu_remote_verification_token: string;
+  feishu_remote_allowed_open_ids: string;
   remote_control_keep_awake: boolean;
 
   // Project Settings
@@ -135,7 +141,19 @@ interface SettingsActions {
   setAutoCodeReviewGlobal: (enabled: boolean) => Promise<void>;
   setHooksEnabled: (enabled: boolean) => Promise<void>;
   setTraceEnabled: (enabled: boolean) => Promise<void>;
-  setTelegramRemoteEnabled: (enabled: boolean) => Promise<void>;
+  setTelegramRemoteEnabled: (enabled: boolean) => Promise<boolean>;
+  setFeishuRemoteEnabled: (enabled: boolean) => Promise<boolean>;
+  setFeishuRemoteAppId: (value: string) => Promise<void>;
+  setFeishuRemoteAppSecret: (value: string) => Promise<void>;
+  setFeishuRemoteEncryptKey: (value: string) => Promise<void>;
+  setFeishuRemoteVerificationToken: (value: string) => Promise<void>;
+  setFeishuRemoteAllowedOpenIds: (value: string) => Promise<void>;
+  getFeishuRemoteAppId: () => string;
+  getFeishuRemoteAppSecret: () => string;
+  getFeishuRemoteEncryptKey: () => string;
+  getFeishuRemoteVerificationToken: () => string;
+  getFeishuRemoteAllowedOpenIds: () => string;
+  getRemoteControlEnabled: () => boolean;
   getAutoApproveEditsGlobal: () => boolean;
   getAutoApprovePlanGlobal: () => boolean;
   getAutoCodeReviewGlobal: () => boolean;
@@ -265,6 +283,12 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'loading' | 'error' | 'isInitialized
   telegram_remote_token: '',
   telegram_remote_allowed_chats: '',
   telegram_remote_poll_timeout: '25',
+  feishu_remote_enabled: false,
+  feishu_remote_app_id: '',
+  feishu_remote_app_secret: '',
+  feishu_remote_encrypt_key: '',
+  feishu_remote_verification_token: '',
+  feishu_remote_allowed_open_ids: '',
   remote_control_keep_awake: true,
   project: DEFAULT_PROJECT,
   current_root_path: '',
@@ -349,6 +373,12 @@ class SettingsDatabase {
       telegram_remote_token: '',
       telegram_remote_allowed_chats: '',
       telegram_remote_poll_timeout: '25',
+      feishu_remote_enabled: 'false',
+      feishu_remote_app_id: '',
+      feishu_remote_app_secret: '',
+      feishu_remote_encrypt_key: '',
+      feishu_remote_verification_token: '',
+      feishu_remote_allowed_open_ids: '',
       remote_control_keep_awake: 'true',
       model_type_main: '',
       model_type_small: '',
@@ -490,6 +520,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         'telegram_remote_token',
         'telegram_remote_allowed_chats',
         'telegram_remote_poll_timeout',
+        'feishu_remote_enabled',
+        'feishu_remote_app_id',
+        'feishu_remote_app_secret',
+        'feishu_remote_encrypt_key',
+        'feishu_remote_verification_token',
+        'feishu_remote_allowed_open_ids',
         'remote_control_keep_awake',
         'reasoning_effort',
         'project',
@@ -581,6 +617,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         telegram_remote_token: rawSettings.telegram_remote_token || '',
         telegram_remote_allowed_chats: rawSettings.telegram_remote_allowed_chats || '',
         telegram_remote_poll_timeout: rawSettings.telegram_remote_poll_timeout || '25',
+        feishu_remote_enabled: rawSettings.feishu_remote_enabled === 'true',
+        feishu_remote_app_id: rawSettings.feishu_remote_app_id || '',
+        feishu_remote_app_secret: rawSettings.feishu_remote_app_secret || '',
+        feishu_remote_encrypt_key: rawSettings.feishu_remote_encrypt_key || '',
+        feishu_remote_verification_token: rawSettings.feishu_remote_verification_token || '',
+        feishu_remote_allowed_open_ids: rawSettings.feishu_remote_allowed_open_ids || '',
         remote_control_keep_awake: rawSettings.remote_control_keep_awake !== 'false',
         project: rawSettings.project || DEFAULT_PROJECT,
         current_root_path: rawSettings.current_root_path || '',
@@ -740,10 +782,68 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     await settingsDb.set('trace_enabled', enabled.toString());
     set({ trace_enabled: enabled });
   },
-
   setTelegramRemoteEnabled: async (enabled: boolean) => {
     await settingsDb.set('telegram_remote_enabled', enabled.toString());
+    const updated = { ...get(), telegram_remote_enabled: enabled };
     set({ telegram_remote_enabled: enabled });
+    return updated.telegram_remote_enabled || updated.feishu_remote_enabled;
+  },
+
+  setFeishuRemoteEnabled: async (enabled: boolean) => {
+    await settingsDb.set('feishu_remote_enabled', enabled.toString());
+    const updated = { ...get(), feishu_remote_enabled: enabled };
+    set({ feishu_remote_enabled: enabled });
+    return updated.telegram_remote_enabled || updated.feishu_remote_enabled;
+  },
+
+  setFeishuRemoteAppId: async (value: string) => {
+    await settingsDb.set('feishu_remote_app_id', value);
+    set({ feishu_remote_app_id: value });
+  },
+
+  setFeishuRemoteAppSecret: async (value: string) => {
+    await settingsDb.set('feishu_remote_app_secret', value);
+    set({ feishu_remote_app_secret: value });
+  },
+
+  setFeishuRemoteEncryptKey: async (value: string) => {
+    await settingsDb.set('feishu_remote_encrypt_key', value);
+    set({ feishu_remote_encrypt_key: value });
+  },
+
+  setFeishuRemoteVerificationToken: async (value: string) => {
+    await settingsDb.set('feishu_remote_verification_token', value);
+    set({ feishu_remote_verification_token: value });
+  },
+
+  setFeishuRemoteAllowedOpenIds: async (value: string) => {
+    await settingsDb.set('feishu_remote_allowed_open_ids', value);
+    set({ feishu_remote_allowed_open_ids: value });
+  },
+
+  getFeishuRemoteAppId: () => {
+    return get().feishu_remote_app_id;
+  },
+
+  getFeishuRemoteAppSecret: () => {
+    return get().feishu_remote_app_secret;
+  },
+
+  getFeishuRemoteEncryptKey: () => {
+    return get().feishu_remote_encrypt_key;
+  },
+
+  getFeishuRemoteVerificationToken: () => {
+    return get().feishu_remote_verification_token;
+  },
+
+  getFeishuRemoteAllowedOpenIds: () => {
+    return get().feishu_remote_allowed_open_ids;
+  },
+
+  getRemoteControlEnabled: () => {
+    const state = get();
+    return state.telegram_remote_enabled || state.feishu_remote_enabled;
   },
 
   // Project Settings
@@ -1226,6 +1326,24 @@ export const settingsManager = {
   setTraceEnabled: (enabled: boolean) => useSettingsStore.getState().setTraceEnabled(enabled),
   setTelegramRemoteEnabled: (enabled: boolean) =>
     useSettingsStore.getState().setTelegramRemoteEnabled(enabled),
+  setFeishuRemoteEnabled: (enabled: boolean) =>
+    useSettingsStore.getState().setFeishuRemoteEnabled(enabled),
+  setFeishuRemoteAppId: (value: string) => useSettingsStore.getState().setFeishuRemoteAppId(value),
+  setFeishuRemoteAppSecret: (value: string) =>
+    useSettingsStore.getState().setFeishuRemoteAppSecret(value),
+  setFeishuRemoteEncryptKey: (value: string) =>
+    useSettingsStore.getState().setFeishuRemoteEncryptKey(value),
+  setFeishuRemoteVerificationToken: (value: string) =>
+    useSettingsStore.getState().setFeishuRemoteVerificationToken(value),
+  setFeishuRemoteAllowedOpenIds: (value: string) =>
+    useSettingsStore.getState().setFeishuRemoteAllowedOpenIds(value),
+  getFeishuRemoteAppId: () => useSettingsStore.getState().getFeishuRemoteAppId(),
+  getFeishuRemoteAppSecret: () => useSettingsStore.getState().getFeishuRemoteAppSecret(),
+  getFeishuRemoteEncryptKey: () => useSettingsStore.getState().getFeishuRemoteEncryptKey(),
+  getFeishuRemoteVerificationToken: () =>
+    useSettingsStore.getState().getFeishuRemoteVerificationToken(),
+  getFeishuRemoteAllowedOpenIds: () => useSettingsStore.getState().getFeishuRemoteAllowedOpenIds(),
+  getRemoteControlEnabled: () => useSettingsStore.getState().getRemoteControlEnabled(),
   setCustomToolsDir: (path: string) => useSettingsStore.getState().setCustomToolsDir(path),
 
   getModel: () => useSettingsStore.getState().getModel(),

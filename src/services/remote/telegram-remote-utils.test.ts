@@ -23,7 +23,7 @@ describe('telegram-remote-utils', () => {
 
   it('does not mix dedup state across channels', () => {
     expect(isDuplicateTelegramMessage('telegram', 'chat-a', 'msg-1', 1000)).toBe(false);
-    expect(isDuplicateTelegramMessage('slack', 'chat-a', 'msg-1', 1000)).toBe(false);
+    expect(isDuplicateTelegramMessage('feishu', 'chat-a', 'msg-1', 1000)).toBe(false);
     expect(isDuplicateTelegramMessage('telegram', 'chat-a', 'msg-1', 1000)).toBe(true);
   });
 

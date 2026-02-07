@@ -11,10 +11,10 @@ import { messageService } from '@/services/message-service';
 import { remoteChannelManager } from '@/services/remote/remote-channel-manager';
 import { remoteMediaService } from '@/services/remote/remote-media-service';
 import {
-  isDuplicateTelegramMessage,
-  normalizeTelegramCommand,
-  splitTelegramText,
-} from '@/services/remote/telegram-remote-utils';
+  isDuplicateRemoteMessage,
+  normalizeRemoteCommand,
+  splitRemoteText,
+} from '@/services/remote/remote-text-utils';
 import { taskService } from '@/services/task-service';
 import { useEditReviewStore } from '@/stores/edit-review-store';
 import { type ExecutionStatus, useExecutionStore } from '@/stores/execution-store';
@@ -22,6 +22,7 @@ import { settingsManager, useSettingsStore } from '@/stores/settings-store';
 import { useTaskStore } from '@/stores/task-store';
 import type { CommandContext } from '@/types/command';
 import type {
+  FeishuGatewayStatus,
   RemoteInboundMessage,
   RemoteSendMessageRequest,
   TelegramGatewayStatus,
@@ -29,9 +30,9 @@ import type {
 import type { TaskSettings } from '@/types/task';
 
 const STREAM_THROTTLE_MS = 1000;
-const TELEGRAM_MESSAGE_LIMIT = 4096;
 const TELEGRAM_STREAM_EDIT_LIMIT = 3800;
 const TELEGRAM_DEDUP_TTL_MS = 5 * 60 * 1000;
+const FEISHU_STREAM_EDIT_LIMIT = 3600;
 
 interface ChatSessionState {
   channelId: RemoteInboundMessage['channelId'];
@@ -111,7 +112,7 @@ class RemoteChatService {
 
   async handleInboundMessage(message: RemoteInboundMessage): Promise<void> {
     if (
-      isDuplicateTelegramMessage(
+      isDuplicateRemoteMessage(
         message.channelId,
         message.chatId,
         message.messageId,
@@ -131,7 +132,7 @@ class RemoteChatService {
   }
 
   private async handleCommand(message: RemoteInboundMessage, text: string): Promise<void> {
-    const normalized = normalizeTelegramCommand(text);
+    const normalized = normalizeRemoteCommand(text);
     const [command, ...rest] = normalized.split(' ');
     const args = rest.join(' ').trim();
 
@@ -400,7 +401,7 @@ class RemoteChatService {
       return;
     }
 
-    const chunks = splitTelegramText(content, TELEGRAM_MESSAGE_LIMIT);
+    const chunks = splitRemoteText(content, session.channelId);
     if (chunks.length === 0) {
       return;
     }
@@ -489,13 +490,15 @@ class RemoteChatService {
     }
 
     session.lastSentAt = now;
-    const chunks = splitTelegramText(content, TELEGRAM_MESSAGE_LIMIT);
+    const chunks = splitRemoteText(content, session.channelId);
     if (chunks.length === 0) {
       return;
     }
 
+    const streamLimit =
+      session.channelId === 'feishu' ? FEISHU_STREAM_EDIT_LIMIT : TELEGRAM_STREAM_EDIT_LIMIT;
     const firstChunk = chunks[0] ?? '';
-    const streamingChunk = firstChunk.slice(0, TELEGRAM_STREAM_EDIT_LIMIT).trim();
+    const streamingChunk = firstChunk.slice(0, streamLimit).trim();
     if (!streamingChunk) {
       return;
     }
@@ -537,27 +540,51 @@ class RemoteChatService {
     if (!text.trim() || !session.streamingMessageId) {
       return;
     }
-    await remoteChannelManager.editMessage({
-      channelId: session.channelId,
-      chatId: session.chatId,
-      messageId: session.streamingMessageId,
-      text,
-      disableWebPagePreview: true,
-    });
+    try {
+      await remoteChannelManager.editMessage({
+        channelId: session.channelId,
+        chatId: session.chatId,
+        messageId: session.streamingMessageId,
+        text,
+        disableWebPagePreview: true,
+      });
+    } catch (error) {
+      logger.warn('[RemoteChatService] Failed to edit message', error);
+      if (session.channelId !== 'feishu') {
+        return;
+      }
+      const fallback = await this.sendMessage(
+        { channelId: session.channelId, chatId: session.chatId } as RemoteInboundMessage,
+        text
+      );
+      if (fallback.messageId) {
+        session.streamingMessageId = fallback.messageId;
+      }
+    }
   }
 
   private async getGatewayStatus(
     channelId: RemoteInboundMessage['channelId']
-  ): Promise<TelegramGatewayStatus | null> {
-    if (channelId !== 'telegram') {
-      return null;
+  ): Promise<TelegramGatewayStatus | FeishuGatewayStatus | null> {
+    if (channelId === 'telegram') {
+      try {
+        return await invoke('telegram_get_status');
+      } catch (error) {
+        logger.warn('[RemoteChatService] Failed to fetch telegram status', error);
+        return null;
+      }
     }
-    try {
-      return await invoke('telegram_get_status');
-    } catch (error) {
-      logger.warn('[RemoteChatService] Failed to fetch gateway status', error);
-      return null;
+
+    if (channelId === 'feishu') {
+      try {
+        return await invoke('feishu_get_status');
+      } catch (error) {
+        logger.warn('[RemoteChatService] Failed to fetch feishu status', error);
+        return null;
+      }
     }
+
+    return null;
   }
 
   private getLocaleText() {

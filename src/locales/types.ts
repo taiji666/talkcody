@@ -525,12 +525,34 @@ export interface LocaleDefinition {
       pollTimeoutHint: string;
       keepAwakeLabel: string;
       keepAwakeHint: string;
+      statusEnabled: string;
+      statusDisabled: string;
       save: string;
       saved: string;
       saveFailed: string;
       errors: {
         tokenMissing: string;
         pollTimeoutRange: string;
+      };
+      feishu: {
+        title: string;
+        description: string;
+        enabled: string;
+        appIdLabel: string;
+        appIdPlaceholder: string;
+        appSecretLabel: string;
+        appSecretPlaceholder: string;
+        encryptKeyLabel: string;
+        encryptKeyPlaceholder: string;
+        verificationTokenLabel: string;
+        verificationTokenPlaceholder: string;
+        allowedOpenIdsLabel: string;
+        allowedOpenIdsPlaceholder: string;
+        allowlistHint: string;
+        errors: {
+          appIdMissing: string;
+          appSecretMissing: string;
+        };
       };
     };
     shortcuts: {

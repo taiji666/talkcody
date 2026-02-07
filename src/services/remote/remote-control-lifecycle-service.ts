@@ -7,6 +7,10 @@ class RemoteControlLifecycleService {
   private static instance: RemoteControlLifecycleService | null = null;
   private isEnabled = false;
   private keepAwakeActive = false;
+  private lastEnabledChannels = {
+    telegram: false,
+    feishu: false,
+  };
 
   private constructor() {}
 
@@ -21,7 +25,9 @@ class RemoteControlLifecycleService {
     try {
       await settingsManager.initialize();
       const state = useSettingsStore.getState();
-      this.isEnabled = state.telegram_remote_enabled;
+      const enabledChannels = this.getEnabledChannels(state);
+      this.isEnabled = enabledChannels.any;
+      this.lastEnabledChannels = enabledChannels.state;
       await this.applyKeepAwake(this.isEnabled && state.remote_control_keep_awake);
 
       if (this.isEnabled) {
@@ -34,14 +40,23 @@ class RemoteControlLifecycleService {
 
   async refresh(): Promise<void> {
     const state = useSettingsStore.getState();
-    this.isEnabled = state.telegram_remote_enabled;
-    await this.applyKeepAwake(this.isEnabled && state.remote_control_keep_awake);
+    const enabledChannels = this.getEnabledChannels(state);
+    const shouldRun = enabledChannels.any;
 
-    if (this.isEnabled) {
-      await remoteChatService.start();
+    await this.applyKeepAwake(shouldRun && state.remote_control_keep_awake);
+
+    if (shouldRun) {
+      if (!this.isEnabled || this.hasChannelChange(enabledChannels.state)) {
+        await remoteChatService.refresh();
+      } else {
+        await remoteChatService.start();
+      }
     } else {
       await remoteChatService.stop();
     }
+
+    this.isEnabled = shouldRun;
+    this.lastEnabledChannels = enabledChannels.state;
   }
 
   async shutdown(): Promise<void> {
@@ -50,6 +65,24 @@ class RemoteControlLifecycleService {
       await releaseSleepPrevention();
       this.keepAwakeActive = false;
     }
+  }
+
+  private getEnabledChannels(state: ReturnType<typeof useSettingsStore.getState>): {
+    any: boolean;
+    state: { telegram: boolean; feishu: boolean };
+  } {
+    const enabled = {
+      telegram: state.telegram_remote_enabled,
+      feishu: state.feishu_remote_enabled,
+    };
+    return { any: enabled.telegram || enabled.feishu, state: enabled };
+  }
+
+  private hasChannelChange(next: { telegram: boolean; feishu: boolean }): boolean {
+    return (
+      this.lastEnabledChannels.telegram !== next.telegram ||
+      this.lastEnabledChannels.feishu !== next.feishu
+    );
   }
 
   private async applyKeepAwake(enabled: boolean): Promise<void> {

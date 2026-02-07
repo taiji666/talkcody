@@ -55,6 +55,7 @@ describe('remote-control-lifecycle-service', () => {
   it('acquires keep-awake only when remote control is enabled', async () => {
     mocks.useSettingsStore.getState.mockReturnValue({
       telegram_remote_enabled: true,
+      feishu_remote_enabled: false,
       remote_control_keep_awake: true,
     });
 
@@ -73,6 +74,7 @@ describe('remote-control-lifecycle-service', () => {
 
     mocks.useSettingsStore.getState.mockReturnValue({
       telegram_remote_enabled: false,
+      feishu_remote_enabled: false,
       remote_control_keep_awake: true,
     });
 
