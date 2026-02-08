@@ -81,11 +81,8 @@ class RemoteMediaService {
   private async prepareAudioAttachment(
     attachment: RemoteAttachment
   ): Promise<{ attachment?: MessageAttachment; textNote?: string }> {
-    const mapped = mapAttachmentBase(attachment);
-
     if (attachment.size > MAX_TRANSCRIPTION_BYTES) {
       return {
-        attachment: mapped,
         textNote: `[voice: ${attachment.filename} too large to transcribe]`,
       };
     }
@@ -96,21 +93,34 @@ class RemoteMediaService {
       const blob = new Blob([data], { type: mimeType });
       const result = await aiTranscriptionService.transcribe({ audioBlob: blob });
       if (result?.text) {
+        // Return only the transcribed text, no audio attachment
         return {
-          attachment: mapped,
-          textNote: `[transcription] ${result.text}`,
+          textNote: result.text,
         };
       }
     } catch (error) {
       logger.warn('[RemoteMediaService] Failed to transcribe audio', error);
+
+      // Check if it's a configuration error (no API key or model configured)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isConfigError =
+        errorMessage.includes('No transcription model configured') ||
+        errorMessage.includes('No available provider') ||
+        errorMessage.includes('Transcription not supported') ||
+        (errorMessage.includes('401') && errorMessage.includes('insufficient permissions'));
+
+      if (isConfigError) {
+        return {
+          textNote: `[voice: Please configure the transcription API key in TalkCody settings first]`,
+        };
+      }
+
       return {
-        attachment: mapped,
         textNote: `[voice: ${attachment.filename} transcription failed]`,
       };
     }
 
     return {
-      attachment: mapped,
       textNote: `[voice: ${attachment.filename} transcription unavailable]`,
     };
   }
