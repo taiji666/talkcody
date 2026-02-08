@@ -6,6 +6,7 @@ import { modelService } from '@/providers/stores/provider-store';
 import { agentRegistry } from '@/services/agents/agent-registry';
 import { commandExecutor } from '@/services/commands/command-executor';
 import { commandRegistry } from '@/services/commands/command-registry';
+import { databaseService } from '@/services/database-service';
 import { executionService } from '@/services/execution-service';
 import { messageService } from '@/services/message-service';
 import { remoteChannelManager } from '@/services/remote/remote-channel-manager';
@@ -180,6 +181,24 @@ class RemoteChatService {
       return;
     }
 
+    if (command === '/model') {
+      logger.info('[RemoteChatService] Model switch command');
+      await this.handleModelSwitch(message, args);
+      return;
+    }
+
+    if (command === '/project') {
+      logger.info('[RemoteChatService] Project switch command');
+      await this.handleProjectSwitch(message, args);
+      return;
+    }
+
+    if (command === '/agent') {
+      logger.info('[RemoteChatService] Agent switch command');
+      await this.handleAgentSwitch(message, args);
+      return;
+    }
+
     if (command === '/stop') {
       logger.info('[RemoteChatService] Stop command');
       await this.handleStop(message);
@@ -329,17 +348,35 @@ class RemoteChatService {
     const execution = session
       ? useExecutionStore.getState().getExecution(session.taskId)
       : undefined;
+    const taskStatus = execution?.status || 'idle';
+
+    const projectId = await settingsManager.getProject();
+    const agentId = await settingsManager.getAgentId();
+    const planModeEnabled = await settingsManager.getPlanModeEnabled();
+
+    let model = '';
+    try {
+      model = await modelService.getCurrentModel();
+    } catch (error) {
+      logger.warn('[RemoteChatService] Failed to resolve current model for status', error);
+    }
+
+    const statusText = this.getLocaleText().RemoteControl.statusDetail({
+      projectId,
+      model: model || '- ',
+      agentId,
+      planModeEnabled,
+      taskStatus,
+      taskId: session?.taskId,
+    });
+    await this.sendMessage(message, statusText);
+
     if (!execution) {
       logger.debug('[RemoteChatService] Status requested with no active task', {
         channelId: message.channelId,
         chatId: message.chatId,
       });
-      await this.sendMessage(message, this.getLocaleText().RemoteControl.noActiveTask);
-      return;
     }
-
-    const statusText = this.getLocaleText().RemoteControl.status(execution.status);
-    await this.sendMessage(message, statusText);
 
     const gatewayStatus = await this.getGatewayStatus(message.channelId);
     if (gatewayStatus?.lastError) {
@@ -376,6 +413,68 @@ class RemoteChatService {
       approved,
       taskId: approval.taskId,
     });
+  }
+
+  private async handleModelSwitch(message: RemoteInboundMessage, args: string): Promise<void> {
+    const modelIdentifier = args.trim();
+    if (!modelIdentifier) {
+      await this.sendMessage(message, this.getLocaleText().RemoteControl.missingModelArg);
+      return;
+    }
+
+    const isAvailable = await modelService.isModelAvailable(modelIdentifier);
+    if (!isAvailable) {
+      await this.sendMessage(
+        message,
+        this.getLocaleText().RemoteControl.invalidModel(modelIdentifier)
+      );
+      return;
+    }
+
+    await settingsManager.setModelType('main', modelIdentifier);
+    await this.sendMessage(
+      message,
+      this.getLocaleText().RemoteControl.modelSwitched(modelIdentifier)
+    );
+  }
+
+  private async handleProjectSwitch(message: RemoteInboundMessage, args: string): Promise<void> {
+    const projectId = args.trim();
+    if (!projectId) {
+      await this.sendMessage(message, this.getLocaleText().RemoteControl.missingProjectArg);
+      return;
+    }
+
+    try {
+      await databaseService.getProject(projectId);
+    } catch (error) {
+      logger.warn('[RemoteChatService] Project not found', {
+        projectId,
+        error,
+      });
+      await this.sendMessage(message, this.getLocaleText().RemoteControl.invalidProject(projectId));
+      return;
+    }
+
+    await settingsManager.setCurrentProjectId(projectId);
+    await this.sendMessage(message, this.getLocaleText().RemoteControl.projectSwitched(projectId));
+  }
+
+  private async handleAgentSwitch(message: RemoteInboundMessage, args: string): Promise<void> {
+    const agentId = args.trim();
+    if (!agentId) {
+      await this.sendMessage(message, this.getLocaleText().RemoteControl.missingAgentArg);
+      return;
+    }
+
+    const agent = await agentRegistry.getWithResolvedTools(agentId);
+    if (!agent) {
+      await this.sendMessage(message, this.getLocaleText().RemoteControl.invalidAgent(agentId));
+      return;
+    }
+
+    await settingsManager.setAssistant(agentId);
+    await this.sendMessage(message, this.getLocaleText().RemoteControl.agentSwitched(agentId));
   }
 
   private async handleStop(message: RemoteInboundMessage): Promise<void> {
