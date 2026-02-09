@@ -32,6 +32,16 @@ pre {
   background-color: transparent !important;
 }
 
+.share-code-block pre,
+.share-code-pre {
+  background-color: rgb(249 250 251) !important;
+}
+
+.dark .share-code-block pre,
+.dark .share-code-pre {
+  background-color: rgb(17 24 39) !important;
+}
+
 .prose pre code,
 .share-markdown pre code,
 pre code,
@@ -54,7 +64,7 @@ code {
   padding: 0px;
   border-radius: 0.25rem;
   background-color: rgb(249 250 251);
-  color: rgb(55 65 81);
+  color: rgb(31 41 55);
 }
 
 .dark code {
@@ -62,7 +72,16 @@ code {
   color: rgb(243 244 246);
 }
 
-/* Light theme - GitHub style */
+.share-code-block code,
+.share-code-pre code {
+  color: rgb(17 24 39);
+}
+
+.dark .share-code-block code,
+.dark .share-code-pre code {
+  color: rgb(243 244 246);
+}
+
 .hljs {
   background: transparent;
   color: rgb(36 41 47);

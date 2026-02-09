@@ -50,19 +50,19 @@ function ShareMarkdownComponent({ content }: ShareMarkdownProps) {
           ),
           th: ({ node, ...props }) => (
             <th
-              className="border border-gray-300 bg-gray-100 px-4 py-2 text-left font-medium dark:border-gray-600 dark:bg-gray-800"
+              className="border border-gray-300 bg-gray-100 px-4 py-2 text-left font-medium text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
               {...props}
             />
           ),
           td: ({ node, ...props }) => (
             <td
-              className="border border-gray-300 px-4 py-2 dark:border-gray-600"
+              className="border border-gray-300 px-4 py-2 text-gray-800 dark:border-gray-600 dark:text-gray-200"
               {...props}
             />
           ),
           blockquote: ({ node, ...props }) => (
             <blockquote
-              className="border-l-4 border-gray-300 pl-4 italic text-gray-600 dark:border-gray-600 dark:text-gray-400"
+              className="border-l-4 border-gray-300 pl-4 italic text-gray-700 dark:border-gray-600 dark:text-gray-400"
               {...props}
             />
           ),
