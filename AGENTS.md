@@ -171,9 +171,10 @@ When generating code, consider:
 - UI must support dark mode
 - Use accurate type definitions and do not use `any` types
 - Keep components modular and reusable
-- Use zustand for state management
-- Try to avoid using dynamic imports
+- Use zustand for state management in ts
+- Try to avoid using dynamic imports in ts
 - User-visible messages and text need to support both English and Chinese.
 - Platform-related functions must be able to work simultaneously on macOS, Windows, and Linux platforms.
-- when need fetch, use `simpleFetch` from `@/lib/tauri-fetch`, not `fetch`.
+- when handle the file path, should consider the windows path separator `\` and the unix path separator `/`.
+- when need fetch in ts, use `simpleFetch` from `@/lib/tauri-fetch`, not `fetch`.
 - When adding test cases, you should minimize mocking as much as possible.

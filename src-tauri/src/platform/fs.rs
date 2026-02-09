@@ -304,17 +304,24 @@ mod tests {
     #[tokio::test]
     async fn test_path_validation_outside_workspace() {
         let fs = FileSystemPlatform::new();
-        let temp_dir = TempDir::new().unwrap();
+        let workspace_dir = TempDir::new().unwrap();
+        let outside_dir = TempDir::new().unwrap();
 
         let ctx = PlatformContext {
-            workspace_root: temp_dir.path().to_path_buf(),
+            workspace_root: workspace_dir.path().to_path_buf(),
             worktree_path: None,
             max_file_size: 1024 * 1024,
             shell_timeout_secs: 60,
         };
 
+        // Create a file outside the workspace
+        let outside_file = outside_dir.path().join("outside.txt");
+        tokio::fs::write(&outside_file, "outside content")
+            .await
+            .unwrap();
+
         // Try to read file outside workspace
-        let result = fs.read_file("/etc/passwd", &ctx).await;
+        let result = fs.read_file(&outside_file.to_string_lossy(), &ctx).await;
         assert!(!result.success);
         assert!(result.error.unwrap().contains("outside workspace"));
     }
