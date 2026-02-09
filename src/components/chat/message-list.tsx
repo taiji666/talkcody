@@ -23,6 +23,9 @@ const hasActualContent = (content: string): boolean => {
 };
 
 const isEmptyMessage = (message: UIMessage): boolean => {
+  if (message.attachments && message.attachments.length > 0) {
+    return false;
+  }
   if (typeof message.content === 'string') {
     return !hasActualContent(message.content);
   }

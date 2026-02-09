@@ -5,7 +5,7 @@ use open_lark::prelude::{
 use open_lark::service::im::v1::message::UpdateMessageRequest;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
@@ -14,6 +14,12 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use tokio::runtime::Builder;
 use tokio::sync::{watch, Mutex};
 use tokio::time::sleep;
+
+// Response for downloading message resources
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageResourceResponse {
+    pub data: Vec<u8>,
+}
 
 const FEISHU_ATTACHMENTS_DIR: &str = "attachments";
 const FEISHU_MEDIA_PREFIX: &str = "feishu";
@@ -224,6 +230,95 @@ fn build_attachment_filename(prefix: &str, original_name: Option<&str>, suffix: 
     }
 }
 
+/// Response from Feishu tenant access token endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TenantAccessTokenResponse {
+    pub code: i32,
+    pub msg: String,
+    #[serde(rename = "tenant_access_token")]
+    pub tenant_access_token: Option<String>,
+    pub expire: Option<i64>,
+}
+
+/// Get tenant access token from Feishu API
+async fn get_tenant_access_token(app_id: &str, app_secret: &str) -> Result<String, String> {
+    let url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal";
+
+    let http_client = reqwest::Client::new();
+    let response = http_client
+        .post(url)
+        .json(&json!({
+            "app_id": app_id,
+            "app_secret": app_secret,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        return Err(format!("Token request failed: HTTP {}", status));
+    }
+
+    let token_resp: TenantAccessTokenResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse token response: {}", e))?;
+
+    if token_resp.code != 0 {
+        return Err(format!(
+            "Token request failed: {} - {}",
+            token_resp.code, token_resp.msg
+        ));
+    }
+
+    token_resp
+        .tenant_access_token
+        .ok_or_else(|| "No tenant_access_token in response".to_string())
+}
+
+/// Download resource from message using Feishu API
+/// Uses /open-apis/im/v1/messages/{message_id}/resources/{file_key} endpoint
+async fn download_message_resource(
+    client: &LarkClient,
+    message_id: &str,
+    file_key: &str,
+    resource_type: &str,
+) -> Result<Vec<u8>, String> {
+    // Get tenant access token
+    let tenant_token =
+        get_tenant_access_token(&client.config.app_id, &client.config.app_secret).await?;
+
+    let url = format!(
+        "https://open.feishu.cn/open-apis/im/v1/messages/{}/resources/{}?type={}",
+        message_id, file_key, resource_type
+    );
+
+    let http_client = reqwest::Client::new();
+    let response = http_client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", tenant_token))
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Download failed: HTTP {} - {}", status, body));
+    }
+
+    let data = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+    Ok(data.to_vec())
+}
+
 fn parse_text_content(content: &str) -> String {
     serde_json::from_str::<Value>(content)
         .ok()
@@ -268,32 +363,36 @@ async fn build_message_payload(
             .and_then(|value| value.get("image_key"))
             .and_then(|value| value.as_str())
         {
-            let image_data = client
-                .im
-                .v1
-                .image
-                .get(image_key, None)
-                .await
-                .map_err(|e| format!("Feishu image download failed: {e:?}"))?;
-            let size = image_data.data.len() as u64;
-            if size <= MAX_FEISHU_MEDIA_BYTES {
-                let filename = build_attachment_filename(
-                    FEISHU_MEDIA_PREFIX,
-                    Some(&format!("image-{}", image_key)),
-                    "image",
-                );
-                let saved_path =
-                    save_attachment_file(&attachments_dir, &filename, &image_data.data).await?;
-                attachments.push(FeishuRemoteAttachment {
-                    id: image_key.to_string(),
-                    attachment_type: "image".to_string(),
-                    file_path: saved_path,
-                    filename,
-                    mime_type: "image/png".to_string(),
-                    size,
-                    duration_seconds: None,
-                    caption: None,
-                });
+            // Use message resource download API for user-sent images
+            // The open-lark image.get() only works for app-uploaded images
+            match download_message_resource(client, message_id, image_key, "image").await {
+                Ok(image_data) => {
+                    let size = image_data.len() as u64;
+                    if size <= MAX_FEISHU_MEDIA_BYTES {
+                        let filename = build_attachment_filename(
+                            FEISHU_MEDIA_PREFIX,
+                            Some(&format!("image-{}", image_key)),
+                            "image",
+                        );
+                        let saved_path =
+                            save_attachment_file(&attachments_dir, &filename, &image_data).await?;
+                        attachments.push(FeishuRemoteAttachment {
+                            id: image_key.to_string(),
+                            attachment_type: "image".to_string(),
+                            file_path: saved_path,
+                            filename,
+                            mime_type: "image/png".to_string(),
+                            size,
+                            duration_seconds: None,
+                            caption: None,
+                        });
+                    }
+                }
+                Err(error) => {
+                    log::warn!("[FeishuGateway] Failed to download image: {}", error);
+                    // Add a placeholder text to indicate image was received but failed to download
+                    text_parts.push(format!("[Image: {}]", image_key));
+                }
             }
         }
     }
@@ -304,46 +403,47 @@ async fn build_message_payload(
             .and_then(|value| value.get("file_key"))
             .and_then(|value| value.as_str())
         {
-            let file_data = client
-                .im
-                .v1
-                .file
-                .get(file_key, None)
-                .await
-                .map_err(|e| format!("Feishu file download failed: {e:?}"))?;
-            let size = file_data.data.len() as u64;
-            if size <= MAX_FEISHU_MEDIA_BYTES {
-                let filename_from_content = parsed
-                    .as_ref()
-                    .and_then(|value| value.get("file_name"))
-                    .and_then(|value| value.as_str());
-                let filename = build_attachment_filename(
-                    FEISHU_MEDIA_PREFIX,
-                    filename_from_content.or(Some(&format!("file-{}", file_key))),
-                    message_type,
-                );
-                let saved_path =
-                    save_attachment_file(&attachments_dir, &filename, &file_data.data).await?;
-                let attachment_type = if message_type == "audio" {
-                    "audio"
-                } else {
-                    "file"
-                };
-                let caption = filename_from_content.map(|name| name.to_string());
-                attachments.push(FeishuRemoteAttachment {
-                    id: file_key.to_string(),
-                    attachment_type: attachment_type.to_string(),
-                    file_path: saved_path,
-                    filename,
-                    mime_type: if message_type == "audio" {
-                        "audio/mpeg".to_string()
-                    } else {
-                        "application/octet-stream".to_string()
-                    },
-                    size,
-                    duration_seconds: None,
-                    caption,
-                });
+            // Use message resource download API for user-sent files
+            match download_message_resource(client, message_id, file_key, message_type).await {
+                Ok(file_data) => {
+                    let size = file_data.len() as u64;
+                    if size <= MAX_FEISHU_MEDIA_BYTES {
+                        let filename_from_content = parsed
+                            .as_ref()
+                            .and_then(|value| value.get("file_name"))
+                            .and_then(|value| value.as_str());
+                        let filename = build_attachment_filename(
+                            FEISHU_MEDIA_PREFIX,
+                            filename_from_content.or(Some(&format!("file-{}", file_key))),
+                            message_type,
+                        );
+                        let saved_path =
+                            save_attachment_file(&attachments_dir, &filename, &file_data).await?;
+                        let attachment_type = if message_type == "audio" {
+                            "audio"
+                        } else {
+                            "file"
+                        };
+                        let caption = filename_from_content.map(|name| name.to_string());
+                        attachments.push(FeishuRemoteAttachment {
+                            id: file_key.to_string(),
+                            attachment_type: attachment_type.to_string(),
+                            file_path: saved_path,
+                            filename,
+                            mime_type: if message_type == "audio" {
+                                "audio/mpeg".to_string()
+                            } else {
+                                "application/octet-stream".to_string()
+                            },
+                            size,
+                            duration_seconds: None,
+                            caption,
+                        });
+                    }
+                }
+                Err(error) => {
+                    log::warn!("[FeishuGateway] Failed to download file: {}", error);
+                }
             }
         }
     }
@@ -747,8 +847,11 @@ pub fn default_state() -> FeishuGatewayState {
 
 #[cfg(test)]
 mod tests {
-    use super::{chat_kind, is_open_id_allowed, sender_kind, FeishuChatKind, FeishuSenderKind};
-    use serde_json::json;
+    use super::{
+        build_attachment_filename, chat_kind, is_open_id_allowed, parse_text_content, sender_kind,
+        FeishuChatKind, FeishuSenderKind,
+    };
+    use serde_json::{json, Value};
 
     #[test]
     fn open_id_allowlist_allows_when_empty() {
@@ -897,5 +1000,130 @@ mod tests {
         assert_eq!(chat_kind("group"), FeishuChatKind::Other);
         assert_eq!(chat_kind("thread"), FeishuChatKind::Other);
         assert_eq!(chat_kind(""), FeishuChatKind::Other);
+    }
+
+    // Tests for image message parsing (bug fix: image download)
+    #[test]
+    fn test_parse_image_message_content() {
+        // Simulate image message content from Feishu webhook
+        let image_content = r#"{"image_key":"img_v3_02uo_f3d7117e-a8bc-4b7c-b423-6d9a54bdbd4g"}"#;
+        let parsed: Value = serde_json::from_str(image_content).unwrap();
+
+        assert_eq!(
+            parsed.get("image_key").and_then(|v| v.as_str()),
+            Some("img_v3_02uo_f3d7117e-a8bc-4b7c-b423-6d9a54bdbd4g")
+        );
+    }
+
+    #[test]
+    fn test_build_attachment_filename_with_extension() {
+        let filename = build_attachment_filename("feishu", Some("image.png"), "image");
+        assert_eq!(filename, "image.png");
+    }
+
+    #[test]
+    fn test_build_attachment_filename_without_extension() {
+        let filename = build_attachment_filename("feishu", Some("image-key-123"), "image");
+        assert_eq!(filename, "image-key-123.bin");
+    }
+
+    #[test]
+    fn test_build_attachment_filename_with_path_traversal() {
+        // Security test: path traversal attempt should be sanitized by replacing / with _
+        let filename = build_attachment_filename("feishu", Some("../../../etc/passwd"), "image");
+        assert_eq!(filename, ".._.._.._etc_passwd"); // / is replaced with _ to prevent path traversal
+    }
+
+    #[test]
+    fn test_parse_text_content_with_json() {
+        let content = r#"{"text":"Hello, world!"}"#;
+        let text = parse_text_content(content);
+        assert_eq!(text, "Hello, world!");
+    }
+
+    #[test]
+    fn test_parse_text_content_plain() {
+        let content = "Plain text message";
+        let text = parse_text_content(content);
+        assert_eq!(text, "Plain text message");
+    }
+
+    // Test for file message parsing
+    #[test]
+    fn test_parse_file_message_content() {
+        let file_content = r#"{"file_key":"file_v3_abc123","file_name":"document.pdf"}"#;
+        let parsed: Value = serde_json::from_str(file_content).unwrap();
+
+        assert_eq!(
+            parsed.get("file_key").and_then(|v| v.as_str()),
+            Some("file_v3_abc123")
+        );
+        assert_eq!(
+            parsed.get("file_name").and_then(|v| v.as_str()),
+            Some("document.pdf")
+        );
+    }
+
+    // Test message resource URL construction
+    #[test]
+    fn test_message_resource_url_format() {
+        let message_id = "om_123456";
+        let file_key = "img_v3_abc123";
+        let resource_type = "image";
+        let expected_url = format!(
+            "https://open.feishu.cn/open-apis/im/v1/messages/{}/resources/{}?type={}",
+            message_id, file_key, resource_type
+        );
+        assert_eq!(
+            expected_url,
+            "https://open.feishu.cn/open-apis/im/v1/messages/om_123456/resources/img_v3_abc123?type=image"
+        );
+    }
+
+    // Test for complete inbound message structure with image
+    #[test]
+    fn test_feishu_inbound_image_message_structure() {
+        let event_json = json!({
+            "schema": "2.0",
+            "header": {
+                "event_id": "test-event-id",
+                "token": "",
+                "create_time": "1770606438811",
+                "event_type": "im.message.receive_v1",
+                "tenant_key": "1aecb0fb6c59dc99",
+                "app_id": "cli_a903847243b9dcc9"
+            },
+            "event": {
+                "message": {
+                    "chat_id": "oc_81441e708eef38e9246d6b0bf3e312e0",
+                    "chat_type": "p2p",
+                    "content": "{\"image_key\":\"img_v3_02uo_f3d7117e-a8bc-4b7c-b423-6d9a54bdbd4g\"}",
+                    "create_time": "1770606438449",
+                    "message_id": "om_x100b57a0b8ae00a0c44651f0f852bb9",
+                    "message_type": "image",
+                    "update_time": "1770606438449"
+                },
+                "sender": {
+                    "sender_id": {
+                        "open_id": "ou_f86fe8ddd1a732594c55a11c379f173c",
+                        "union_id": "on_d2439d6674dd1eab9d56460cf5a96e80",
+                        "user_id": null
+                    },
+                    "sender_type": "user",
+                    "tenant_key": "1aecb0fb6c59dc99"
+                }
+            }
+        });
+
+        let event: Value = serde_json::from_value(event_json).unwrap();
+        let message = &event["event"]["message"];
+
+        assert_eq!(message["message_type"], "image");
+
+        let content: Value = serde_json::from_str(message["content"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            content["image_key"],
+            "img_v3_02uo_f3d7117e-a8bc-4b7c-b423-6d9a54bdbd4g"
+        );
     }
 }

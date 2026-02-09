@@ -132,6 +132,31 @@ describe('MessageList', () => {
     expect(screen.getByTestId('message-tool-1')).toBeInTheDocument();
   });
 
+  it('should not skip empty messages that have attachments', () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'user-1',
+        role: 'user',
+        content: '',
+        timestamp: new Date(),
+        attachments: [
+          {
+            id: 'att-1',
+            type: 'image',
+            filename: 'test.png',
+            filePath: '/tmp/test.png',
+            mimeType: 'image/png',
+            size: 1234,
+          },
+        ],
+      },
+    ];
+
+    render(<MessageList messages={messages} />);
+
+    expect(screen.getByTestId('message-user-1')).toBeInTheDocument();
+  });
+
   it('should skip empty messages', () => {
     const messages: UIMessage[] = [
       {
