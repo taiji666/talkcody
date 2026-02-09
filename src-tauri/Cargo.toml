@@ -76,6 +76,9 @@ tower = "0.4"
 open-lark = { version = "0.14.0", default-features = false, features = ["im", "websocket"] }
 futures = "0.3.31"
 
+[patch.crates-io]
+open-lark = { git = "https://github.com/talkcody/open-lark", branch = "fix-user-id-null" }
+
 [target."cfg(any(target_os = \"macos\", windows, target_os = \"linux\"))".dependencies]
 tauri-plugin-single-instance = { version = "2.0.0", features = ["deep-link"] }
 tauri-plugin-updater = "2"

@@ -748,6 +748,7 @@ pub fn default_state() -> FeishuGatewayState {
 #[cfg(test)]
 mod tests {
     use super::{chat_kind, is_open_id_allowed, sender_kind, FeishuChatKind, FeishuSenderKind};
+    use serde_json::json;
 
     #[test]
     fn open_id_allowlist_allows_when_empty() {
@@ -770,5 +771,131 @@ mod tests {
     fn chat_kind_filters_non_p2p() {
         assert_eq!(chat_kind("p2p"), FeishuChatKind::P2p);
         assert_eq!(chat_kind("group"), FeishuChatKind::Other);
+    }
+
+    // Test for parsing Feishu message with null user_id (the bug fix)
+    #[test]
+    fn test_parse_feishu_event_with_null_user_id() {
+        // This is the exact payload format that was causing the error:
+        // "Failed to handle event: invalid type: null, expected a string"
+        let event_json = json!({
+            "schema": "2.0",
+            "header": {
+                "event_id": "8bfdcea24d9b4d00ad2cb9958fc7f267",
+                "token": "",
+                "create_time": "1770601614676",
+                "event_type": "im.message.receive_v1",
+                "tenant_key": "1aecb0fb6c59dc99",
+                "app_id": "cli_a903847243b9dcc9"
+            },
+            "event": {
+                "message": {
+                    "chat_id": "oc_81441e708eef38e9246d6b0bf3e312e0",
+                    "chat_type": "p2p",
+                    "content": "{\"text\":\"你好\"}",
+                    "create_time": "1770601614342",
+                    "message_id": "om_x100b57a7862e88acb2650fb8381126e",
+                    "message_type": "text",
+                    "update_time": "1770601614342"
+                },
+                "sender": {
+                    "sender_id": {
+                        "open_id": "ou_f86fe8ddd1a732594c55a11c379f173c",
+                        "union_id": "on_d2439d6674dd1eab9d56460cf5a96e80",
+                        "user_id": null  // This was causing the deserialization error
+                    },
+                    "sender_type": "user",
+                    "tenant_key": "1aecb0fb6c59dc99"
+                }
+            }
+        });
+
+        // Parse the event - this should not fail after the fix
+        let result: Result<serde_json::Value, _> = serde_json::from_value(event_json.clone());
+        assert!(result.is_ok(), "Should parse event with null user_id");
+
+        let event = result.unwrap();
+        let sender_id = event["event"]["sender"]["sender_id"].clone();
+
+        // Verify the structure
+        assert_eq!(sender_id["open_id"], "ou_f86fe8ddd1a732594c55a11c379f173c");
+        assert_eq!(sender_id["union_id"], "on_d2439d6674dd1eab9d56460cf5a96e80");
+        assert!(sender_id["user_id"].is_null(), "user_id should be null");
+    }
+
+    #[test]
+    fn test_parse_feishu_event_with_valid_user_id() {
+        // Test with valid user_id (not null)
+        let event_json = json!({
+            "schema": "2.0",
+            "header": {
+                "event_id": "test-event-id",
+                "token": "",
+                "create_time": "1770601614676",
+                "event_type": "im.message.receive_v1",
+                "tenant_key": "tenant_key",
+                "app_id": "app_id"
+            },
+            "event": {
+                "message": {
+                    "chat_id": "oc_test",
+                    "chat_type": "p2p",
+                    "content": "{\"text\":\"Hello\"}",
+                    "create_time": "1770601614342",
+                    "message_id": "om_test",
+                    "message_type": "text",
+                    "update_time": "1770601614342"
+                },
+                "sender": {
+                    "sender_id": {
+                        "open_id": "ou_test",
+                        "union_id": "on_test",
+                        "user_id": "user123"  // Valid user_id
+                    },
+                    "sender_type": "user",
+                    "tenant_key": "tenant_key"
+                }
+            }
+        });
+
+        let result: Result<serde_json::Value, _> = serde_json::from_value(event_json.clone());
+        assert!(result.is_ok(), "Should parse event with valid user_id");
+
+        let event = result.unwrap();
+        let sender_id = event["event"]["sender"]["sender_id"].clone();
+
+        assert_eq!(sender_id["open_id"], "ou_test");
+        assert_eq!(sender_id["union_id"], "on_test");
+        assert_eq!(sender_id["user_id"], "user123");
+    }
+
+    #[test]
+    fn test_open_id_allowlist_with_multiple_ids() {
+        let allowed = vec![
+            "ou_user1".to_string(),
+            "ou_user2".to_string(),
+            "ou_user3".to_string(),
+        ];
+
+        assert!(is_open_id_allowed(&allowed, "ou_user1"));
+        assert!(is_open_id_allowed(&allowed, "ou_user2"));
+        assert!(is_open_id_allowed(&allowed, "ou_user3"));
+        assert!(!is_open_id_allowed(&allowed, "ou_user4"));
+    }
+
+    #[test]
+    fn test_sender_kind_edge_cases() {
+        assert_eq!(sender_kind("user"), FeishuSenderKind::User);
+        assert_eq!(sender_kind("app"), FeishuSenderKind::Other);
+        assert_eq!(sender_kind(""), FeishuSenderKind::Other);
+        assert_eq!(sender_kind("unknown"), FeishuSenderKind::Other);
+    }
+
+    #[test]
+    fn test_chat_kind_edge_cases() {
+        assert_eq!(chat_kind("p2p"), FeishuChatKind::P2p);
+        assert_eq!(chat_kind("group"), FeishuChatKind::Other);
+        assert_eq!(chat_kind("thread"), FeishuChatKind::Other);
+        assert_eq!(chat_kind(""), FeishuChatKind::Other);
     }
 }
