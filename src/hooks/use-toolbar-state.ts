@@ -50,7 +50,7 @@ export function useToolbarState(): ToolbarState {
     state.currentTaskId ? state.getTask(state.currentTaskId) : undefined
   );
   const cost = currentTask?.cost ?? 0;
-  const inputTokens = currentTask?.input_token ?? 0;
+  const inputTokens = currentTask?.last_request_input_token ?? currentTask?.input_token ?? 0;
   const outputTokens = currentTask?.output_token ?? 0;
   const contextUsage = currentTask?.context_usage ?? 0;
   const taskModel = currentTask?.model;

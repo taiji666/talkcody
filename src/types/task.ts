@@ -25,6 +25,7 @@ export interface Task {
   cost: number;
   input_token: number;
   output_token: number;
+  last_request_input_token?: number;
   model?: string; // Model identifier used for this task (e.g., modelKey@providerId)
   settings?: string; // JSON string for task-level settings
   context_usage?: number; // Percentage of context window used

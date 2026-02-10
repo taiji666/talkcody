@@ -861,7 +861,11 @@ export class LLMService {
                       }
 
                       if (this.taskId && !isSubagent) {
-                        useTaskStore.getState().updateTaskUsage(this.taskId, {
+                        const taskStore = useTaskStore.getState();
+                        taskStore.updateTask(this.taskId, {
+                          last_request_input_token: inputTokens,
+                        });
+                        taskStore.updateTaskUsage(this.taskId, {
                           costDelta: cost,
                           inputTokensDelta: inputTokens,
                           outputTokensDelta: outputTokens,
