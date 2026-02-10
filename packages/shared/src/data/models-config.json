@@ -1,5 +1,5 @@
 {
-  "version": "2026-02-05T19:28:19.344Z",
+  "version": "2026-02-09T19:28:19.344Z",
   "models": {
     "gpt-5-nano": {
       "name": "GPT-5 Nano",
@@ -463,6 +463,20 @@
         "input": "0",
         "output": "0"
       }
+    },
+    "Pony Alpha": {
+      "name": "Pony Alpha Free",
+      "providers": [
+        "openRouter"
+      ],
+      "providerMappings": {
+        "openRouter": "openrouter/pony-alpha"
+      },
+      "pricing": {
+        "input": "0",
+        "output": "0"
+      },
+      "context_length": 200000
     },
     "gemini-2.5-flash-image": {
       "name": "Nano Banana",
