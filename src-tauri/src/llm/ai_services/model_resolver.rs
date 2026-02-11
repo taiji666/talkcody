@@ -178,6 +178,7 @@ mod tests {
                     image_input: false,
                     image_output: false,
                     audio_input: false,
+                    video_input: false,
                     interleaved: false,
                     providers: vec![provider_id.to_string()],
                     provider_mappings: None,

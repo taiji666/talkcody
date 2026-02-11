@@ -168,6 +168,7 @@ mod tests {
                     image_input: false,
                     image_output: false,
                     audio_input: false,
+                    video_input: false,
                     interleaved: false,
                     providers: vec!["openai".to_string()],
                     provider_mappings: None,

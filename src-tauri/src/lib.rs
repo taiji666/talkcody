@@ -112,6 +112,20 @@ struct AppState {
     window_registry: WindowRegistry,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CloseAction {
+    Allow,
+    ExitApp,
+}
+
+fn close_action_for_window(label: &str) -> CloseAction {
+    if label == "main" {
+        CloseAction::ExitApp
+    } else {
+        CloseAction::Allow
+    }
+}
+
 #[tauri::command]
 fn start_file_watching(
     path: String,
@@ -1118,16 +1132,13 @@ pub fn run() {
             feishu_gateway::feishu_edit_message,
         ])
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "main" {
-                    api.prevent_close();
-                    let window = window.clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Err(error) = window.hide() {
-                            log::warn!("Failed to hide main window: {}", error);
-                        }
-                    });
-                    return;
+            if let WindowEvent::CloseRequested { .. } = event {
+                match close_action_for_window(window.label()) {
+                    CloseAction::ExitApp => {
+                        window.app_handle().exit(0);
+                        return;
+                    }
+                    CloseAction::Allow => {}
                 }
             }
             // Clean up resources when main window is destroyed
@@ -1182,12 +1193,26 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    use super::close_action_for_window;
     use super::init_trace_writer_state;
     use crate::database::Database;
     use crate::llm::tracing::writer::TraceWriter;
     use std::sync::Arc;
     use tauri::Manager;
     use tempfile::TempDir;
+
+    #[test]
+    fn close_action_for_main_window_exits_app() {
+        assert_eq!(close_action_for_window("main"), super::CloseAction::ExitApp);
+    }
+
+    #[test]
+    fn close_action_for_non_main_window_allows_close() {
+        assert_eq!(
+            close_action_for_window("settings"),
+            super::CloseAction::Allow
+        );
+    }
 
     /// This test uses Tauri test infrastructure that may not work on Windows CI
     #[test]

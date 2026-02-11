@@ -175,7 +175,6 @@ impl Default for StreamingManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::streaming::events::TokenEventData;
 
     #[tokio::test]
     async fn test_throttle_config() {
