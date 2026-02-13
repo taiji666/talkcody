@@ -1,7 +1,7 @@
 # fly.toml configuration for TalkCody API Service
 
 app = "talkcody-api"
-primary_region = "hkg"
+primary_region = "sin"
 
 [build]
   dockerfile = "Dockerfile"
@@ -9,8 +9,17 @@ primary_region = "hkg"
 [env]
   HOST = "0.0.0.0"
   PORT = "8080"
+  DATA_ROOT = "/data/talkcody"
+  WORKSPACE_ROOT = "/data/workspace"
+
+[[mounts]]
+  source = "talkcody_data"
+  destination = "/data"
 
 [[services]]
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
   http_checks = []
   internal_port = 8080
   processes = ["app"]

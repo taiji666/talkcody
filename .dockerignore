@@ -1,0 +1,50 @@
+# Rust build artifacts
+target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test files
+tests/
+**/*.test.rs
+
+# Other
+*.log
+.env
+
+# Node.js (not needed for API service)
+node_modules/
+dist/
+build/
+
+# Frontend source (not needed for API service)
+src/components/
+src/pages/
+src/hooks/
+src/styles/
+src/assets/
+
+# Large/binary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.icns
