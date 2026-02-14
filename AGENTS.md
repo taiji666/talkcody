@@ -176,5 +176,14 @@ When generating code, consider:
 - User-visible messages and text need to support both English and Chinese.
 - Platform-related functions must be able to work simultaneously on macOS, Windows, and Linux platforms.
 - when handle the file path, should consider the windows path separator `\` and the unix path separator `/`.
+- when serde the rust command, your serialization format should be compatible with TS.
+  - example:
+  ```
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+ pub struct ContextCompactionResult {
+     #[serde(rename = "compressedSummary")]
+     pub compressed_summary: String,
+ }
+```
 - when need fetch in ts, use `simpleFetch` from `@/lib/tauri-fetch`, not `fetch`.
 - When adding test cases, you should minimize mocking as much as possible.
