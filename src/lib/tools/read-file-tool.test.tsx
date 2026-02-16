@@ -1,7 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 vi.mock('@tauri-apps/api/path', () => ({
-  join: vi.fn((...parts: string[]) => parts.join('/')),
   resolveResource: vi.fn(),
 }));
 
@@ -41,9 +40,8 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-import { join, resolveResource } from '@tauri-apps/api/path';
+import { resolveResource } from '@tauri-apps/api/path';
 import { readTextFile } from '@tauri-apps/plugin-fs';
-import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
 import { readFile } from './read-file-tool';
 
 const testContext = { taskId: 'task-123' };
@@ -68,34 +66,9 @@ describe('readFile tool resource handling', () => {
     expect(result.content).toBe('bundled content');
   });
 
-  it('falls back to dev resource path when resolveResource fails', async () => {
+  it('returns not found when bundled resource is missing', async () => {
     vi.mocked(resolveResource).mockRejectedValue(new Error('missing resource'));
-    vi.mocked(readTextFile).mockResolvedValueOnce('dev content');
-
-    const result = await readFile.execute(
-      { file_path: '$RESOURCE/ppt-references/styles/corporate.md' },
-      testContext
-    );
-
-    expect(result.success).toBe(true);
-    expect(getEffectiveWorkspaceRoot).toHaveBeenCalledWith(testContext.taskId);
-    expect(join).toHaveBeenCalledWith(
-      '/repo',
-      'src-tauri',
-      'resources',
-      'ppt-references',
-      'styles',
-      'corporate.md'
-    );
-    expect(readTextFile).toHaveBeenCalledWith(
-      '/repo/src-tauri/resources/ppt-references/styles/corporate.md'
-    );
-    expect(result.content).toBe('dev content');
-  });
-
-  it('returns not found when bundled and dev resources are missing', async () => {
-    vi.mocked(resolveResource).mockRejectedValue(new Error('missing resource'));
-    vi.mocked(readTextFile).mockRejectedValue(new Error('missing dev resource'));
+    vi.mocked(readTextFile).mockRejectedValue(new Error('missing resource file'));
 
     const result = await readFile.execute(
       { file_path: '$RESOURCE/ppt-references/missing.md' },

@@ -1,10 +1,14 @@
-import { join, resolveResource } from '@tauri-apps/api/path';
 import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { z } from 'zod';
 import { GenericToolDoing } from '@/components/tools/generic-tool-doing';
 import { GenericToolResult } from '@/components/tools/generic-tool-result';
 import { createTool } from '@/lib/create-tool';
 import { logger } from '@/lib/logger';
+import {
+  isResourcePath,
+  resolveResourcePath,
+  stripResourcePrefix,
+} from '@/lib/tools/resource-paths';
 import { repositoryService } from '@/services/repository-service';
 import { normalizeFilePath } from '@/services/repository-utils';
 import { getEffectiveWorkspaceRoot } from '@/services/workspace-root-service';
@@ -107,14 +111,8 @@ function extractLines(
 export const readFile = createTool({
   name: 'readFile',
   description: `Use this tool to read the contents of an existing file.
-
 This tool will return the complete file content as a string by default.
-You can optionally specify a starting line and number of lines to read a specific portion of the file.
-
-Path formats:
-- Absolute path: /Users/name/project/file.txt (for workspace files)
-- $RESOURCE prefix: $RESOURCE/ppt-references/styles/blueprint.md (for bundled app resources, MUST use exact prefix including $)
-- Relative path: src/file.ts (will be resolved against workspace root)`,
+You can optionally specify a starting line and number of lines to read a specific portion of the file.`,
   inputSchema: z.object({
     file_path: z
       .string()
@@ -151,12 +149,10 @@ Path formats:
       }
 
       // Handle $RESOURCE prefix for bundled resource files
-      if (resolvedPath.startsWith('$RESOURCE/')) {
-        const resourcePath = resolvedPath.slice('$RESOURCE/'.length);
-        const normalizedResourcePath = resourcePath.replace(/\\/g, '/');
-        const resourceSegments = normalizedResourcePath.split('/').filter(Boolean);
+      if (isResourcePath(resolvedPath)) {
+        const resourcePath = stripResourcePrefix(resolvedPath);
         try {
-          const fullPath = await resolveResource(resourcePath);
+          const fullPath = await resolveResourcePath(resolvedPath);
           const content = await readTextFile(fullPath);
           return {
             success: true,
@@ -165,38 +161,12 @@ Path formats:
             message: `Successfully read resource file: ${resolvedPath}`,
           };
         } catch (_error) {
-          try {
-            const rootPath = await getEffectiveWorkspaceRoot(context.taskId);
-            if (!rootPath) {
-              return {
-                success: false,
-                file_path: resolvedPath,
-                content: null,
-                message: 'Project root path is not set.',
-              };
-            }
-
-            const devResourcePath = await join(
-              rootPath,
-              'src-tauri',
-              'resources',
-              ...resourceSegments
-            );
-            const content = await readTextFile(devResourcePath);
-            return {
-              success: true,
-              file_path: resolvedPath,
-              content,
-              message: `Successfully read resource file: ${resolvedPath}`,
-            };
-          } catch (_devError) {
-            return {
-              success: false,
-              file_path: resolvedPath,
-              content: null,
-              message: `Resource file not found: ${resourcePath}`,
-            };
-          }
+          return {
+            success: false,
+            file_path: resolvedPath,
+            content: null,
+            message: `Resource file not found: ${resourcePath}`,
+          };
         }
       }
 
