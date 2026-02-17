@@ -1157,6 +1157,11 @@ const en: LocaleDefinition = {
     disabledBody: 'Turn tracing back on to capture new spans and events.',
     disabledListHint: 'Tracing is disabled. Enable it to capture new traces.',
     disabledTraceCountLabel: 'Tracing disabled',
+    deleteOldTracesButton: 'Delete Old Traces',
+    deleteOldTracesConfirm: 'Delete all traces older than 3 days?',
+    deleteOldTracesSuccess: 'Deleted old traces successfully',
+    deleteOldTracesError: 'Failed to delete old traces',
+    deletingLabel: 'Deleting...',
   },
 
   Initialization: {

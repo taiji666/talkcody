@@ -276,6 +276,12 @@ export class DatabaseService {
     return this.traceService.endSpan(spanId, endedAt);
   }
 
+  async deleteOldTraces(cutoffTimestamp: number): Promise<void> {
+    await this.ensureInitialized();
+    if (!this.traceService) throw new Error('Trace service not initialized');
+    return this.traceService.deleteOldTraces(cutoffTimestamp);
+  }
+
   async getAttachmentsForMessage(messageId: string): Promise<MessageAttachment[]> {
     await this.ensureInitialized();
     if (!this.taskService) throw new Error('Task service not initialized');

@@ -147,58 +147,62 @@ export function ProjectsPage() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((project) => (
-            <Card
-              key={project.id}
-              className={`cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                currentProjectId === project.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' : ''
-              }`}
-              onClick={() => handleProjectSelect(project.id)}
-            >
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-lg">
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="h-5 w-5" />
-                    {project.name}
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {project.root_path && (
-                        <DropdownMenuItem
-                          onClick={(e) => handleOpenInNewWindow(e, project)}
-                          className="flex items-center gap-2"
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {projects.map((project) => (
+              <Card
+                key={project.id}
+                className={`cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                  currentProjectId === project.id
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                    : ''
+                }`}
+                onClick={() => handleProjectSelect(project.id)}
+              >
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center justify-between text-lg">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="h-5 w-5" />
+                      {project.name}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
                         >
-                          <ExternalLink className="h-4 w-4" />
-                          {t.Projects.page.openInNewWindow}
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {project.root_path && (
+                          <DropdownMenuItem
+                            onClick={(e) => handleOpenInNewWindow(e, project)}
+                            className="flex items-center gap-2"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            {t.Projects.page.openInNewWindow}
+                          </DropdownMenuItem>
+                        )}
+                        {project.root_path && <DropdownMenuSeparator />}
+                        <DropdownMenuItem
+                          onClick={(e) => handleDeleteProject(e, project)}
+                          className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {t.Projects.page.deleteProject}
                         </DropdownMenuItem>
-                      )}
-                      {project.root_path && <DropdownMenuSeparator />}
-                      <DropdownMenuItem
-                        onClick={(e) => handleDeleteProject(e, project)}
-                        className="flex items-center gap-2 text-red-600 focus:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        {t.Projects.page.deleteProject}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="text-sm">{project.root_path}</CardDescription>
-              </CardContent>
-            </Card>
-          ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="text-sm">{project.root_path}</CardDescription>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -1117,6 +1117,11 @@ const zh: LocaleDefinition = {
     disabledBody: '开启后将记录新的 Trace、Span 和事件。',
     disabledListHint: 'Tracing 已关闭，开启后才会记录新的 Trace。',
     disabledTraceCountLabel: 'Tracing 已关闭',
+    deleteOldTracesButton: '删除旧 Trace',
+    deleteOldTracesConfirm: '删除所有 3 天前的 Trace？',
+    deleteOldTracesSuccess: '删除旧 Trace 成功',
+    deleteOldTracesError: '删除旧 Trace 失败',
+    deletingLabel: '删除中...',
   },
 
   Initialization: {

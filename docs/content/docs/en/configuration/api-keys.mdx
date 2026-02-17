@@ -20,6 +20,7 @@ TalkCody supports multiple AI providers, each requiring their own API key:
 - **Groq** - Groq models
 - **OpenRouter** - Gateway supporting 500+ models
 - **Vercel AI Gateway** - Gateway supporting 100+ models
+- **VolcEngine** - VolcEngine Doubao models
 - **Alibaba Qwen** - Qwen models
 - **Zhipu AI** - GLM models
 - **Z.AI** - GLM models (International)
@@ -274,6 +275,53 @@ Moonshot offers up to 128K context window, especially suitable for processing lo
 
 <Callout type="tip">
 Moonshot supports TalkCody's Coding Plan feature. You can select Moonshot models in Agent configuration for code planning.
+</Callout>
+
+### VolcEngine
+
+VolcEngine is ByteDance's cloud service platform, providing Doubao (豆包) series large language models with powerful Chinese language understanding and generation capabilities.
+
+**Steps to obtain:**
+1. Visit [console.volcengine.com](https://console.volcengine.com)
+2. Click "Login" or "Register" in the top right corner to create an account
+3. Complete identity verification (enterprise or individual)
+4. After logging in, enter the console
+5. Search for "Ark" in the top search bar or visit the [Ark Platform](https://console.volcengine.com/ark)
+6. Select "API Key Management" from the left menu
+7. Click "Create API Key"
+8. Name your key and select permission scope
+9. Copy the generated key
+10. Paste it into TalkCody's VolcEngine field
+
+<Callout type="info">
+VolcEngine Ark Platform offers multiple model versions including Doubao-pro and Doubao-lite. New users receive free trial credits upon registration.
+</Callout>
+
+<Callout type="tip">
+Before using VolcEngine, you need to create an inference endpoint in the Ark Platform's "Online Inference" section. After obtaining the endpoint ID, you can use it in TalkCody.
+</Callout>
+
+### Alibaba Qwen
+
+Alibaba Cloud's Qwen (通义千问) series large language models, optimized for Chinese language scenarios with powerful text understanding and generation capabilities.
+
+**Steps to obtain:**
+1. Visit [dashscope.aliyun.com](https://dashscope.aliyun.com)
+2. Click "Login" in the top right corner to sign in with your Alibaba Cloud account
+3. Complete identity verification (if not already done)
+4. After logging in, enter the console
+5. Select "API-KEY Management" from the left menu
+6. Click "Create New API-KEY"
+7. Name your key and select the business space
+8. Copy the generated key (format: `sk-...`)
+9. Paste it into TalkCody's Alibaba Qwen field
+
+<Callout type="info">
+Alibaba Cloud Bailian Platform offers generous free quotas. New users can receive millions of free token credits, sufficient for daily development and testing.
+</Callout>
+
+<Callout type="tip">
+Qwen supports TalkCody's Coding Plan feature. You can select Qwen models in Agent configuration for code planning.
 </Callout>
 
 ### LM Studio

@@ -1122,6 +1122,11 @@ export interface LocaleDefinition {
     disabledBody: string;
     disabledListHint: string;
     disabledTraceCountLabel: string;
+    deleteOldTracesButton: string;
+    deleteOldTracesConfirm: string;
+    deleteOldTracesSuccess: string;
+    deleteOldTracesError: string;
+    deletingLabel: string;
   };
 
   Toast: {

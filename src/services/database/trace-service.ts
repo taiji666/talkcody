@@ -243,4 +243,28 @@ export class TraceService {
       eventsBySpanId,
     };
   }
+
+  async deleteOldTraces(cutoffTimestamp: number): Promise<void> {
+    // Delete in proper order to respect foreign key constraints
+    // 1. First delete span_events for spans belonging to old traces
+    await this.db.execute(
+      `DELETE FROM span_events WHERE span_id IN (
+        SELECT id FROM spans WHERE trace_id IN (
+          SELECT id FROM traces WHERE started_at < $1
+        )
+      )`,
+      [cutoffTimestamp]
+    );
+
+    // 2. Then delete spans for old traces
+    await this.db.execute(
+      `DELETE FROM spans WHERE trace_id IN (
+        SELECT id FROM traces WHERE started_at < $1
+      )`,
+      [cutoffTimestamp]
+    );
+
+    // 3. Finally delete the old traces
+    await this.db.execute('DELETE FROM traces WHERE started_at < $1', [cutoffTimestamp]);
+  }
 }

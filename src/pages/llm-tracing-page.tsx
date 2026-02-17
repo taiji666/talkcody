@@ -2,7 +2,15 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -117,6 +125,9 @@ export function LLMTracingPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSpans, setExpandedSpans] = useState<Set<string>>(() => new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const traceEnabled = useSettingsStore((state) => state.trace_enabled);
   const setTraceEnabled = useSettingsStore((state) => state.setTraceEnabled);
 
@@ -180,6 +191,26 @@ export function LLMTracingPage() {
     },
     [t.Tracing.loadError, traceEnabled]
   );
+
+  const handleDeleteOldTraces = useCallback(async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      // Calculate cutoff timestamp (3 days ago)
+      const cutoffTimestamp = Date.now() - 3 * 24 * 60 * 60 * 1000;
+      await databaseService.deleteOldTraces(cutoffTimestamp);
+      logger.info('Deleted old traces successfully');
+      setShowDeleteConfirm(false);
+      // Reload traces after deletion
+      await loadTraces();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.Tracing.deleteOldTracesError;
+      setDeleteError(message);
+      logger.error('Failed to delete old traces', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [loadTraces, t.Tracing.deleteOldTracesError]);
 
   useEffect(() => {
     loadTraces();
@@ -588,6 +619,14 @@ export function LLMTracingPage() {
           <Button onClick={loadTraces} disabled={loadingList || !traceEnabled} size="sm">
             {t.Common.refresh}
           </Button>
+          <Button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={!traceEnabled}
+            size="sm"
+            variant="destructive"
+          >
+            {t.Tracing.deleteOldTracesButton}
+          </Button>
         </div>
       </div>
 
@@ -607,6 +646,28 @@ export function LLMTracingPage() {
           <ScrollArea className="h-full">{detailContent}</ScrollArea>
         </div>
       </div>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.Tracing.deleteOldTracesButton}</DialogTitle>
+            <DialogDescription>{t.Tracing.deleteOldTracesConfirm}</DialogDescription>
+          </DialogHeader>
+          {deleteError && <div className="text-sm text-destructive py-2">{deleteError}</div>}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeleting}
+            >
+              {t.Common.cancel}
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteOldTraces} disabled={isDeleting}>
+              {isDeleting ? t.Tracing.deletingLabel : t.Common.delete}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

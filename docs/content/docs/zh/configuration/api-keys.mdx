@@ -19,7 +19,8 @@ TalkCody 支持多个 AI 提供商,每个都需要自己的 API 密钥:
 - **Groq** - Groq 模型
 - **OpenRouter** - 支持 500+ 模型的网关
 - **Vercel AI Gateway** - 支持 100+ 模型的网关
-- **Alibaba Qwen** - Qwen 模型
+- **VolcEngine** - 火山引擎 Doubao 模型
+- **Alibaba Qwen** - 通义千问模型
 - **Zhipu AI** - GLM 模型
 - **Z.AI** - GLM 模型(国际版)
 - **MiniMax** - MiniMax 模型
@@ -269,6 +270,53 @@ Moonshot 提供最长 128K 上下文窗口，特别适合处理长文档。新�
 
 <Callout type="tip">
 Moonshot 支持 TalkCody 的 Coding Plan 功能，可以在 Agent 配置中选择 Moonshot 模型进行代码规划。
+</Callout>
+
+### VolcEngine
+
+火山引擎（VolcEngine）是字节跳动旗下的云服务平台，提供 Doubao（豆包）系列大语言模型，具有强大的中文理解和生成能力。
+
+**获取步骤**：
+1. 访问 [console.volcengine.com](https://console.volcengine.com)
+2. 点击右上角 "登录" 或 "注册" 创建账户
+3. 完成实名认证（企业或个人认证）
+4. 登录后进入控制台
+5. 在顶部搜索栏搜索 "方舟" 或访问 [方舟平台](https://console.volcengine.com/ark)
+6. 在左侧菜单选择 "API Key 管理"
+7. 点击 "创建 API Key"
+8. 为密钥命名并选择权限范围
+9. 复制生成的密钥
+10. 粘贴到 TalkCody 的 VolcEngine 字段
+
+<Callout type="info">
+火山引擎方舟平台提供 Doubao-pro、Doubao-lite 等多个模型版本，新用户注册可获得免费试用额度。
+</Callout>
+
+<Callout type="tip">
+使用火山引擎前，需要先在方舟平台 "在线推理" 中创建推理接入点（Endpoint），获得接入点 ID 后才能在 TalkCody 中使用。
+</Callout>
+
+### Alibaba Qwen
+
+阿里云提供的通义千问（Qwen）系列大语言模型，针对中文场景优化，具有强大的文本理解和生成能力。
+
+**获取步骤**：
+1. 访问 [dashscope.aliyun.com](https://dashscope.aliyun.com)
+2. 点击右上角 "登录" 使用阿里云账户登录
+3. 完成实名认证（如果尚未完成）
+4. 登录后进入控制台
+5. 在左侧菜单选择 "API-KEY 管理"
+6. 点击 "创建新的 API-KEY"
+7. 为密钥命名并选择业务空间
+8. 复制生成的密钥（格式：`sk-...`）
+9. 粘贴到 TalkCody 的 Alibaba Qwen 字段
+
+<Callout type="info">
+阿里云百炼平台提供丰富的免费额度，新用户可获得数百万 Token 的免费调用额度，足够日常开发和测试使用。
+</Callout>
+
+<Callout type="tip">
+通义千问支持 TalkCody 的 Coding Plan 功能，可以在 Agent 配置中选择 Qwen 模型进行代码规划。
 </Callout>
 
 ### LM Studio
