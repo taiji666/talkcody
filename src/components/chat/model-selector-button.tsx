@@ -51,11 +51,44 @@ export function ModelSelectorButton() {
     searchQuery,
   });
 
-  // Sort models: recently used first (top 5), then others
+  // Define priority models (these will appear at the top of the list)
+  // Format: `${modelKey}@${provider}` or just `${modelKey}` to match any provider
+  const priorityModelIdentifiers = useMemo(
+    () => ['gpt-5.3-codex@openai', 'kimi-k2.5@kimi_coding', 'minimax-m25@talkcody'],
+    []
+  );
+
+  // Sort models: priority models first, then recently used (top 5), then others
   const sortedModels = useMemo(() => {
     if (filteredModels.length === 0) return [];
 
-    // Get recently used model identifiers (top 5 by timestamp)
+    // Get priority models that exist in filteredModels
+    const priorityModels: AvailableModel[] = [];
+    const nonPriorityModels: AvailableModel[] = [];
+
+    for (const model of filteredModels) {
+      const identifier = `${model.key}@${model.provider}`;
+      // Check if model matches priority list (by full identifier or just key)
+      const isPriority = priorityModelIdentifiers.some(
+        (priority) => priority === identifier || priority === model.key
+      );
+      if (isPriority) {
+        priorityModels.push(model);
+      } else {
+        nonPriorityModels.push(model);
+      }
+    }
+
+    // Sort priority models to match the order in priorityModelIdentifiers
+    priorityModels.sort((a, b) => {
+      const aId = `${a.key}@${a.provider}`;
+      const bId = `${b.key}@${b.provider}`;
+      const aIndex = priorityModelIdentifiers.findIndex((p) => p === aId || p === a.key);
+      const bIndex = priorityModelIdentifiers.findIndex((p) => p === bId || p === b.key);
+      return aIndex - bIndex;
+    });
+
+    // Get recently used model identifiers from non-priority models (top 5 by timestamp)
     const recentModelEntries = Object.entries(recentModels).filter(
       (entry): entry is [string, number] => typeof entry[1] === 'number'
     );
@@ -64,11 +97,11 @@ export function ModelSelectorButton() {
       .slice(0, 5);
     const topRecentModels = sortedRecentEntries.map(([identifier]) => identifier);
 
-    // Separate models into recent and others
+    // Separate non-priority models into recent and others
     const recent: AvailableModel[] = [];
     const others: AvailableModel[] = [];
 
-    for (const model of filteredModels) {
+    for (const model of nonPriorityModels) {
       const identifier = `${model.key}@${model.provider}`;
       if (topRecentModels.includes(identifier)) {
         recent.push(model);
@@ -83,12 +116,12 @@ export function ModelSelectorButton() {
       const bId = `${b.key}@${b.provider}`;
       const aIndex = topRecentModels.indexOf(aId);
       const bIndex = topRecentModels.indexOf(bId);
-      return aIndex - bIndex; // Lower index (more recent) comes first
+      return aIndex - bIndex;
     });
 
-    // Return recent models first, then others
-    return [...recent, ...others];
-  }, [filteredModels, recentModels]);
+    // Return priority models first, then recent models, then others
+    return [...priorityModels, ...recent, ...others];
+  }, [filteredModels, recentModels, priorityModelIdentifiers]);
 
   // Find current model info
   const currentModel = useMemo(() => {
