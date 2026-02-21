@@ -2,7 +2,6 @@
 // Unified OAuth Status Hook
 // Centralized access to all OAuth providers' connection status
 
-import { useClaudeOAuthStore } from '@/providers/oauth/claude-oauth-store';
 import { useGitHubCopilotOAuthStore } from '@/providers/oauth/github-copilot-oauth-store';
 import { useOpenAIOAuthStore } from '@/providers/oauth/openai-oauth-store';
 
@@ -11,7 +10,6 @@ import { useOpenAIOAuthStore } from '@/providers/oauth/openai-oauth-store';
  * Maps provider IDs to their connection status
  */
 export type OAuthStatusMap = {
-  anthropic: boolean;
   openai: boolean;
   github_copilot: boolean;
 };
@@ -31,12 +29,10 @@ export type OAuthStatusMap = {
  * ```
  */
 export function useOAuthStatus(): OAuthStatusMap {
-  const anthropicConnected = useClaudeOAuthStore((state) => state.isConnected);
   const openaiConnected = useOpenAIOAuthStore((state) => state.isConnected);
   const githubCopilotConnected = useGitHubCopilotOAuthStore((state) => state.isConnected);
 
   return {
-    anthropic: anthropicConnected,
     openai: openaiConnected,
     github_copilot: githubCopilotConnected,
   };

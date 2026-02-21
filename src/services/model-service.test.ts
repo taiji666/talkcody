@@ -79,13 +79,6 @@ vi.mock('@/providers/custom/custom-model-service', () => ({
   },
 }));
 
-vi.mock('@/providers/oauth/claude-oauth-store', () => ({
-  getClaudeOAuthAccessToken: vi.fn().mockResolvedValue(null),
-  useClaudeOAuthStore: {
-    getState: vi.fn().mockReturnValue({ accessToken: null }),
-  },
-}));
-
 vi.mock('@/providers/oauth/openai-oauth-store', () => ({
   getOpenAIOAuthAccessToken: vi.fn().mockResolvedValue(null),
   useOpenAIOAuthStore: {

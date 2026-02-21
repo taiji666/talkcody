@@ -4,7 +4,6 @@
 
 import { ChevronDown, ChevronRight, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { ClaudeOAuthLogin } from '@/components/settings/claude-oauth-login';
 import { GitHubCopilotOAuthLogin } from '@/components/settings/github-copilot-oauth-login';
 import { OpenAIOAuthLogin } from '@/components/settings/openai-oauth-login';
 import { Button } from '@/components/ui/button';
@@ -18,7 +17,6 @@ import type { ProviderDefinition } from '@/types';
  * Maps provider IDs to their corresponding OAuth login components
  */
 const OAUTH_COMPONENTS: Record<string, React.ComponentType> = {
-  anthropic: ClaudeOAuthLogin,
   openai: OpenAIOAuthLogin,
   github_copilot: GitHubCopilotOAuthLogin,
 };
