@@ -64,6 +64,9 @@ windows-sys = { version = "0.59", features = ["Win32_System_Power"] }
 cocoa = "0.25"
 objc = "0.2.7"
 
+[target."cfg(target_os = \"linux\")".dependencies]
+which = { workspace = true }
+
 [dev-dependencies]
 tempfile = { workspace = true }
 tauri = { workspace = true, features = ["test"] }

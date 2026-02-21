@@ -31,7 +31,7 @@ async function readJson<T>(relativePath: string): Promise<T> {
 
 describe('Updater capabilities', () => {
   it('config enables default capability for desktop build', async () => {
-    const config = await readJson<TauriConfig>('src-tauri/desktop/tauri.conf.json');
+    const config = await readJson<TauriConfig>('src-tauri/tauri.conf.json');
 
     expect(config.app?.security?.capabilities).toBeDefined();
     expect(config.app?.security?.capabilities).toContain('default');
@@ -39,7 +39,7 @@ describe('Updater capabilities', () => {
 
   it('desktop default capability includes updater permissions', async () => {
     const capability = await readJson<{ permissions?: Array<string | { identifier: string }> }>(
-      'src-tauri/desktop/capabilities/default.json',
+      'src-tauri/capabilities/default.json',
     );
 
     const permissions = capability.permissions ?? [];

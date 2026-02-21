@@ -1169,7 +1169,7 @@ pub fn run() {
                 }
             }
         })
-        .build(tauri::generate_context!())
+        .build(tauri::generate_context!("../tauri.conf.json"))
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             // RunEvent::Exit always runs (unlike ExitRequested which is inconsistent on macOS)
