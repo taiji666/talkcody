@@ -54,7 +54,6 @@ struct AnalyticsPayload {
     app_version: Option<String>,
 }
 
-/// Get OS name
 fn get_os_name() -> String {
     #[cfg(target_os = "macos")]
     return "macos".to_string();
@@ -66,12 +65,10 @@ fn get_os_name() -> String {
     return "unknown".to_string();
 }
 
-/// Get OS version
 fn get_os_version() -> String {
     std::env::consts::OS.to_string()
 }
 
-/// Start analytics session - called on app startup
 pub async fn start_session(
     state: &AnalyticsState,
     app_data_dir: &std::path::Path,
@@ -131,7 +128,6 @@ pub async fn start_session(
     }
 }
 
-/// Send session_end event - called when main window is closing
 pub fn send_session_end_sync(state: &AnalyticsState) {
     let session = {
         let guard = match state.session.lock() {

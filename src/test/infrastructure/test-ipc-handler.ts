@@ -213,11 +213,6 @@ export class TestIPCHandler {
       return { status: 200, headers: {}, body: '' };
     }
 
-    // Skill commands
-    if (cmd === 'create_skill_tarball' || cmd === 'extract_skill_tarball') {
-      return null;
-    }
-
     // LLM commands
     if (cmd === 'llm_list_available_models') {
       return [];

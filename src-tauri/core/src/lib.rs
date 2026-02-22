@@ -15,7 +15,6 @@ pub mod types;
 
 // Shared utilities used by server/desktop
 pub mod analytics;
-pub mod archive;
 pub mod background_tasks;
 pub mod code_navigation;
 pub mod constants;

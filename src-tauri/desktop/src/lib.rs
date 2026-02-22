@@ -8,7 +8,6 @@ pub mod window_manager;
 pub mod llm_commands;
 
 pub use talkcody_core::analytics;
-pub use talkcody_core::archive;
 pub use talkcody_core::background_tasks;
 pub use talkcody_core::code_navigation;
 pub use talkcody_core::constants;
@@ -40,9 +39,6 @@ pub use talkcody_core::walker;
 pub use talkcody_core::websocket;
 
 use analytics::AnalyticsState;
-use archive::{
-    CreateTarballRequest, CreateTarballResult, ExtractTarballRequest, ExtractTarballResult,
-};
 use code_navigation::{CodeNavState, CodeNavigationService};
 use database::Database;
 use file_watcher::FileWatcher;
@@ -718,16 +714,6 @@ async fn execute_skill_script(
 }
 
 #[tauri::command]
-fn create_skill_tarball(request: CreateTarballRequest) -> Result<CreateTarballResult, String> {
-    archive::create_tarball(request)
-}
-
-#[tauri::command]
-fn extract_skill_tarball(request: ExtractTarballRequest) -> Result<ExtractTarballResult, String> {
-    archive::extract_tarball(request)
-}
-
-#[tauri::command]
 fn estimate_tokens(text: String) -> usize {
     let mut cjk_count = 0;
     let mut other_count = 0;
@@ -1047,8 +1033,6 @@ pub fn run() {
             websocket::ws_disconnect,
             execute_user_shell,
             execute_skill_script,
-            create_skill_tarball,
-            extract_skill_tarball,
             terminal::pty_spawn,
             terminal::pty_write,
             terminal::pty_resize,
