@@ -13,6 +13,7 @@ export interface Env {
   RELEASES_BUCKET?: R2Bucket;
   TALKCODY_DAILY_TOKEN_LIMIT?: string;
   SERPER_API_KEY?: string;
+  JINA_API_KEY?: string;
 }
 
 // Cloudflare R2 Bucket type
@@ -87,6 +88,7 @@ declare global {
       NODE_ENV?: string;
       TALKCODY_DAILY_TOKEN_LIMIT?: string;
       SERPER_API_KEY?: string;
+      JINA_API_KEY?: string;
     }
   }
 }

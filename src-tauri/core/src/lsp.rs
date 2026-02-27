@@ -476,7 +476,7 @@ async fn install_vue_language_server(app: &AppHandle) -> Result<String, String> 
     );
 
     let (runner, install_args) =
-        get_global_install_command("@vue/language-server").map_err(|e| format!("{}", e))?;
+        get_global_install_command("@vue/language-server").map_err(|e| e.to_string())?;
 
     log::info!("Installing Vue Language Server using {}", runner);
 
@@ -528,7 +528,7 @@ async fn install_typescript_language_server(app: &AppHandle) -> Result<String, S
     );
 
     let (runner, install_args) =
-        get_global_install_command("typescript-language-server").map_err(|e| format!("{}", e))?;
+        get_global_install_command("typescript-language-server").map_err(|e| e.to_string())?;
 
     log::info!("Installing TypeScript Language Server using {}", runner);
 

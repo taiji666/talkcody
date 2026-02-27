@@ -108,7 +108,7 @@ impl ToolDependencyAnalyzer {
         let write_edit_tools: Vec<ToolRequest> = categorized
             .write
             .into_iter()
-            .chain(categorized.edit.into_iter())
+            .chain(categorized.edit)
             .collect();
 
         if !write_edit_tools.is_empty() {
@@ -203,6 +203,22 @@ impl ToolDependencyAnalyzer {
         (vec![group], tools.len(), 1)
     }
 
+    /// Helper to extract targets for a single tool
+    fn extract_single_tool_targets(&self, tool: &ToolRequest) -> Vec<String> {
+        let mut targets = vec![];
+
+        // Try common file path fields
+        if let Some(path) = tool.input.get("path").and_then(|v| v.as_str()) {
+            targets.push(path.to_string());
+        } else if let Some(file_path) = tool.input.get("file_path").and_then(|v| v.as_str()) {
+            targets.push(file_path.to_string());
+        } else if let Some(file_path) = tool.input.get("filePath").and_then(|v| v.as_str()) {
+            targets.push(file_path.to_string());
+        }
+
+        targets
+    }
+
     /// Create write/edit groups (sequential by target file for safety)
     fn create_write_edit_groups(
         &self,
@@ -214,7 +230,7 @@ impl ToolDependencyAnalyzer {
         let mut no_target_tools = vec![];
 
         for tool in tools {
-            let targets = self.extract_target_files(&[tool.clone()]);
+            let targets = self.extract_single_tool_targets(tool);
             if targets.is_empty() {
                 no_target_tools.push(tool.clone());
             } else {

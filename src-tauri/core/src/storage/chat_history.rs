@@ -54,7 +54,7 @@ impl ChatHistoryRepository {
             )
             .await?;
 
-        Ok(result.rows.first().map(|row| row_to_session(row)))
+        Ok(result.rows.first().map(row_to_session))
     }
 
     /// Update session status

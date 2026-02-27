@@ -88,8 +88,11 @@ impl AIGatewayImageClient {
     /// Examples: google/gemini-2.5-flash-image, google/gemini-3-pro-image
     fn is_multimodal_image_model(&self, model: &str) -> bool {
         let model_lower = model.to_lowercase();
-        // Multimodal image models typically have "-image" suffix and are Gemini models
-        model_lower.contains("gemini") && model_lower.ends_with("-image")
+        if !model_lower.contains("gemini") {
+            return false;
+        }
+        // Gemini image models use -image or -image-preview suffixes
+        model_lower.ends_with("-image") || model_lower.ends_with("-image-preview")
     }
 
     /// Parse a data URL and extract the base64 data and mime type
@@ -260,6 +263,7 @@ mod tests {
 
         assert!(client.is_multimodal_image_model("google/gemini-2.5-flash-image"));
         assert!(client.is_multimodal_image_model("google/gemini-3-pro-image"));
+        assert!(client.is_multimodal_image_model("google/gemini-3.1-flash-image-preview"));
         assert!(!client.is_multimodal_image_model("dall-e-3"));
         assert!(!client.is_multimodal_image_model("google/imagen-3.0-generate-002"));
     }

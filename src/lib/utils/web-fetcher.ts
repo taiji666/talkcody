@@ -66,7 +66,7 @@ function validateUrl(url: string): void {
   }
 }
 
-const MAX_INLINE_CONTENT_LENGTH = 10000;
+const MAX_INLINE_CONTENT_LENGTH = 40000;
 
 function truncateContent(content: string): string {
   return content.slice(0, MAX_INLINE_CONTENT_LENGTH);

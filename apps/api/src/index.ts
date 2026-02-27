@@ -22,6 +22,7 @@ import skillsMarketplaceRoutes from './routes/skills-marketplace';
 import talkcodyProviderRoutes from './routes/talkcody-provider';
 import updatesRoutes from './routes/updates';
 import userRoutes from './routes/users';
+import webFetchRoutes from './routes/web-fetch';
 import type { HonoContext } from './types/context';
 
 const app = new Hono<HonoContext>();
@@ -103,6 +104,7 @@ app.route('/api/analytics', analyticsRoutes);
 app.route('/api/talkcody', talkcodyProviderRoutes);
 app.route('/api/search', searchRoutes);
 app.route('/api/shares', shareRoutes);
+app.route('/api/web-fetch', webFetchRoutes);
 
 // 404 handler
 app.notFound((c) => {

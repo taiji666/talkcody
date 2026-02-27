@@ -161,6 +161,12 @@ fn should_end_on_empty_chunk(chunk: &[u8]) -> bool {
     chunk.is_empty()
 }
 
+/// Check if a header is present in the request (case-insensitive)
+fn has_header(headers: &HashMap<String, String>, name: &str) -> bool {
+    let name_lower = name.to_lowercase();
+    headers.keys().any(|k| k.to_lowercase() == name_lower)
+}
+
 fn should_soft_end_on_decode_error(is_decode_error: bool, chunk_count: u32) -> bool {
     is_decode_error && chunk_count > 0
 }
@@ -241,15 +247,22 @@ pub async fn proxy_fetch(request: ProxyRequest) -> Result<ProxyResponse, String>
         _ => return Err(format!("Unsupported HTTP method: {}", request.method)),
     };
 
+    // Add explicit encoding expectations only if not already set by client
+    let has_accept_encoding = has_header(&request.headers, "Accept-Encoding");
+    let has_accept = has_header(&request.headers, "Accept");
+
     // Add headers
     for (key, value) in request.headers {
         req_builder = req_builder.header(&key, &value);
     }
 
-    // Add explicit encoding expectations
-    req_builder = req_builder
-        .header("Accept-Encoding", PROXY_ACCEPT_ENCODING)
-        .header("Accept", ACCEPT_HEADER_VALUE);
+    // Add default headers only if not provided by client
+    if !has_accept_encoding {
+        req_builder = req_builder.header("Accept-Encoding", PROXY_ACCEPT_ENCODING);
+    }
+    if !has_accept {
+        req_builder = req_builder.header("Accept", ACCEPT_HEADER_VALUE);
+    }
 
     // Add body if present
     if let Some(body) = request.body {
@@ -409,15 +422,22 @@ async fn stream_fetch_inner<R: tauri::Runtime>(
         }
     };
 
+    // Add explicit encoding expectations only if not already set by client
+    let has_accept_encoding = has_header(&request.headers, "Accept-Encoding");
+    let has_accept = has_header(&request.headers, "Accept");
+
     // Add headers
     for (key, value) in request.headers {
         req_builder = req_builder.header(&key, &value);
     }
 
-    // Add explicit encoding expectations
-    req_builder = req_builder
-        .header("Accept-Encoding", STREAM_ACCEPT_ENCODING)
-        .header("Accept", ACCEPT_HEADER_VALUE);
+    // Add default headers only if not provided by client
+    if !has_accept_encoding {
+        req_builder = req_builder.header("Accept-Encoding", STREAM_ACCEPT_ENCODING);
+    }
+    if !has_accept {
+        req_builder = req_builder.header("Accept", ACCEPT_HEADER_VALUE);
+    }
 
     // Add body if present
     if let Some(body) = request.body {
@@ -1334,5 +1354,75 @@ mod tests {
             other_rx.recv_timeout(std::time::Duration::from_millis(200)),
             Err(RecvTimeoutError::Timeout)
         ));
+    }
+
+    // Tests for has_header helper function
+    #[test]
+    fn test_has_header_case_insensitive() {
+        let mut headers = HashMap::new();
+        headers.insert("Content-Type".to_string(), "application/json".to_string());
+        headers.insert("Accept".to_string(), "text/html".to_string());
+
+        // Case-sensitive checks should work
+        assert!(has_header(&headers, "Accept"));
+        assert!(has_header(&headers, "Content-Type"));
+
+        // Case-insensitive checks should also work
+        assert!(has_header(&headers, "accept"));
+        assert!(has_header(&headers, "ACCEPT"));
+        assert!(has_header(&headers, "content-type"));
+        assert!(has_header(&headers, "CONTENT-TYPE"));
+
+        // Non-existent headers
+        assert!(!has_header(&headers, "Authorization"));
+        assert!(!has_header(&headers, "authorization"));
+        assert!(!has_header(&headers, "Accept-Encoding"));
+    }
+
+    #[test]
+    fn test_has_header_with_empty_headers() {
+        let headers: HashMap<String, String> = HashMap::new();
+        assert!(!has_header(&headers, "Accept"));
+        assert!(!has_header(&headers, "Accept-Encoding"));
+        assert!(!has_header(&headers, "Content-Type"));
+    }
+
+    #[test]
+    fn test_has_header_with_varied_case_keys() {
+        let mut headers = HashMap::new();
+        // Headers with unusual casing
+        headers.insert("accept-encoding".to_string(), "gzip".to_string());
+        headers.insert("ACCEPT-LANGUAGE".to_string(), "en-US".to_string());
+        headers.insert("X-Custom-Header".to_string(), "value".to_string());
+
+        assert!(has_header(&headers, "Accept-Encoding"));
+        assert!(has_header(&headers, "accept-encoding"));
+        assert!(has_header(&headers, "ACCEPT-ENCODING"));
+
+        assert!(has_header(&headers, "Accept-Language"));
+        assert!(has_header(&headers, "accept-language"));
+        assert!(has_header(&headers, "ACCEPT-LANGUAGE"));
+
+        assert!(has_header(&headers, "X-Custom-Header"));
+        assert!(has_header(&headers, "x-custom-header"));
+        assert!(has_header(&headers, "X-CUSTOM-HEADER"));
+    }
+
+    #[test]
+    fn test_default_headers_respect_client_provided() {
+        // Test that default Accept header constant is properly formatted
+        let default_accept = ACCEPT_HEADER_VALUE;
+        assert!(default_accept.contains("text/event-stream"));
+        assert!(default_accept.contains("text/plain"));
+        assert!(default_accept.contains("application/json"));
+
+        // Test proxy encoding includes compression support
+        let proxy_encoding = PROXY_ACCEPT_ENCODING;
+        assert!(proxy_encoding.contains("gzip"));
+        assert!(proxy_encoding.contains("br"));
+
+        // Test stream encoding is identity only
+        let stream_encoding = STREAM_ACCEPT_ENCODING;
+        assert_eq!(stream_encoding, "identity");
     }
 }

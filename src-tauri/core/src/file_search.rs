@@ -53,36 +53,33 @@ impl HighPerformanceFileSearch {
         let walker = WorkspaceWalker::new(root_path, config).build();
         let mut results = Vec::new();
 
-        for result in walker {
-            if let Ok(entry) = result {
-                // Skip root directory
-                if entry.depth() == 0 {
-                    continue;
-                }
+        for entry in walker.flatten() {
+            // Skip root directory
+            if entry.depth() == 0 {
+                continue;
+            }
 
-                let path = entry.path();
+            let path = entry.path();
 
-                // Filter files only (not directories for now, but we can include them if needed)
-                if !path.is_file() {
-                    continue;
-                }
+            // Filter files only (not directories for now, but we can include them if needed)
+            if !path.is_file() {
+                continue;
+            }
 
-                // Check if it's a code file
-                if !self.is_code_file(path) {
-                    continue;
-                }
+            // Check if it's a code file
+            if !self.is_code_file(path) {
+                continue;
+            }
 
-                if let Ok(relative_path) = path.strip_prefix(root_path) {
-                    let relative_path_str = relative_path.to_string_lossy();
-                    // Normalize path separators to forward slashes for cross-platform search
-                    let normalized_path = relative_path_str.replace('\\', "/");
+            if let Ok(relative_path) = path.strip_prefix(root_path) {
+                let relative_path_str = relative_path.to_string_lossy();
+                // Normalize path separators to forward slashes for cross-platform search
+                let normalized_path = relative_path_str.replace('\\', "/");
 
-                    if let Some(search_result) = self.match_path(&normalized_path, path, &keywords)
-                    {
-                        results.push(search_result);
-                        if results.len() >= self.max_results {
-                            break;
-                        }
+                if let Some(search_result) = self.match_path(&normalized_path, path, &keywords) {
+                    results.push(search_result);
+                    if results.len() >= self.max_results {
+                        break;
                     }
                 }
             }

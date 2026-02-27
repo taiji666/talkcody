@@ -11,13 +11,17 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 /// a console window from flashing when spawning child processes.
 /// On other platforms, this is equivalent to `std::process::Command::new()`.
 pub fn new_command(program: &str) -> std::process::Command {
-    let cmd = std::process::Command::new(program);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
+        let mut cmd = std::process::Command::new(program);
         cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd
     }
-    cmd
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new(program)
+    }
 }
 
 /// Create a new `tokio::process::Command` with console window hidden on Windows.
@@ -26,12 +30,16 @@ pub fn new_command(program: &str) -> std::process::Command {
 /// a console window from flashing when spawning child processes.
 /// On other platforms, this is equivalent to `tokio::process::Command::new()`.
 pub fn new_async_command(program: &str) -> tokio::process::Command {
-    let cmd = tokio::process::Command::new(program);
     #[cfg(windows)]
     {
+        let mut cmd = tokio::process::Command::new(program);
         cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd
     }
-    cmd
+    #[cfg(not(windows))]
+    {
+        tokio::process::Command::new(program)
+    }
 }
 
 /// Get the shell executable path for Windows, handling COMSPEC environment variable

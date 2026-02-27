@@ -35,12 +35,7 @@ fn is_port_available(port: u16) -> bool {
 /// Find an available port starting from the default port
 /// Returns the first available port in the range [PORT_RANGE_START, PORT_RANGE_END]
 fn find_available_port() -> Option<u16> {
-    for port in PORT_RANGE_START..=PORT_RANGE_END {
-        if is_port_available(port) {
-            return Some(port);
-        }
-    }
-    None
+    (PORT_RANGE_START..=PORT_RANGE_END).find(|&port| is_port_available(port))
 }
 
 /// Generate success HTML page

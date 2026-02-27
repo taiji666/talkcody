@@ -87,18 +87,16 @@ fn status_to_git_file_status(status: Status, is_staged: bool) -> GitFileStatus {
         } else {
             GitFileStatus::Modified
         }
+    } else if status.is_wt_modified() {
+        GitFileStatus::Modified
+    } else if status.is_wt_deleted() {
+        GitFileStatus::Deleted
+    } else if status.is_wt_renamed() {
+        GitFileStatus::Renamed
+    } else if status.is_wt_new() {
+        GitFileStatus::Untracked
     } else {
-        if status.is_wt_modified() {
-            GitFileStatus::Modified
-        } else if status.is_wt_deleted() {
-            GitFileStatus::Deleted
-        } else if status.is_wt_renamed() {
-            GitFileStatus::Renamed
-        } else if status.is_wt_new() {
-            GitFileStatus::Untracked
-        } else {
-            GitFileStatus::Modified
-        }
+        GitFileStatus::Modified
     }
 }
 

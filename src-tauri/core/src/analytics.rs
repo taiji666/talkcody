@@ -20,12 +20,18 @@ pub struct AnalyticsState {
     pub client: Client,
 }
 
-impl AnalyticsState {
-    pub fn new() -> Self {
+impl Default for AnalyticsState {
+    fn default() -> Self {
         Self {
             session: Arc::new(Mutex::new(None)),
             client: Client::new(),
         }
+    }
+}
+
+impl AnalyticsState {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

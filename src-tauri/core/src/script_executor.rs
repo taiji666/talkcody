@@ -85,7 +85,7 @@ impl ScriptExecutor {
         cmd.stderr(Stdio::piped());
 
         // Execute with timeout if specified
-        let timeout_duration = request.timeout_ms.map(|ms| Duration::from_millis(ms));
+        let timeout_duration = request.timeout_ms.map(Duration::from_millis);
 
         let execution_result = if let Some(timeout) = timeout_duration {
             // Execute with timeout

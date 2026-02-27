@@ -134,7 +134,7 @@ impl KeepAwakeState {
         }
         #[cfg(target_os = "macos")]
         {
-            return self.start_keep_awake_macos();
+            self.start_keep_awake_macos()
         }
         #[cfg(target_os = "linux")]
         {
@@ -154,7 +154,7 @@ impl KeepAwakeState {
         }
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         {
-            return self.stop_keep_awake_process();
+            self.stop_keep_awake_process()
         }
         #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
         {

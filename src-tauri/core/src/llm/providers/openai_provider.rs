@@ -37,7 +37,7 @@ impl OpenAiProvider {
     fn normalize_model_id(model: &str) -> String {
         let model_id = model
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or(model)
             .split('@')
             .next()
@@ -172,20 +172,7 @@ impl Provider for OpenAiProvider {
     }
 
     async fn build_request(&self, ctx: &ProviderContext<'_>) -> Result<Value, String> {
-        if self.is_oauth_mode(ctx.api_key_manager).await {
-            let request_ctx = RequestBuildContext {
-                model: ctx.model,
-                messages: ctx.messages,
-                tools: ctx.tools,
-                temperature: ctx.temperature,
-                max_tokens: ctx.max_tokens,
-                top_p: ctx.top_p,
-                top_k: ctx.top_k,
-                provider_options: ctx.provider_options,
-                extra_body: ctx.provider_config.extra_body.as_ref(),
-            };
-            self.responses_protocol.build_request(request_ctx)
-        } else if Self::is_responses_model(ctx.model) {
+        if self.is_oauth_mode(ctx.api_key_manager).await || Self::is_responses_model(ctx.model) {
             let request_ctx = RequestBuildContext {
                 model: ctx.model,
                 messages: ctx.messages,
@@ -222,10 +209,7 @@ impl Provider for OpenAiProvider {
         data: &str,
         state: &mut StreamParseState,
     ) -> Result<Option<StreamEvent>, String> {
-        if self.is_oauth_mode(ctx.api_key_manager).await {
-            let parse_ctx = StreamParseContext { event_type, data };
-            self.responses_protocol.parse_stream_event(parse_ctx, state)
-        } else if Self::is_responses_model(ctx.model) {
+        if self.is_oauth_mode(ctx.api_key_manager).await || Self::is_responses_model(ctx.model) {
             let parse_ctx = StreamParseContext { event_type, data };
             self.responses_protocol.parse_stream_event(parse_ctx, state)
         } else {

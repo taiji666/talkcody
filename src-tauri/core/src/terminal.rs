@@ -255,7 +255,7 @@ pub async fn pty_spawn(
 
         // Check if shell is zsh and disable PROMPT_SP (partial line marker)
         if shell.contains("zsh") {
-            cmd.args(&["-o", "no_prompt_sp", "-l"]);
+            cmd.args(["-o", "no_prompt_sp", "-l"]);
         } else {
             cmd.arg("-l");
         }

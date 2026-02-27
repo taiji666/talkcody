@@ -74,13 +74,7 @@ impl EventBuffer {
         if let Some(events) = cache.get(session_id) {
             let mut result: Vec<StreamingEvent> = events
                 .iter()
-                .filter(|e| {
-                    if let Some(after_id) = after_event_id {
-                        e.id > after_id.to_string()
-                    } else {
-                        true
-                    }
-                })
+                .filter(|e| after_event_id.is_none_or(|after_id| e.id.as_str() > after_id))
                 .cloned()
                 .filter_map(|e| e.try_into().ok())
                 .collect();

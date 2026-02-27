@@ -157,8 +157,7 @@ fn current_time_ms() -> u64 {
 /// Generate a unique task ID
 fn generate_task_id() -> String {
     let mut rng = rand::thread_rng();
-    let random_part: String = std::iter::repeat(())
-        .take(8)
+    let random_part: String = std::iter::repeat_n((), 8)
         .map(|_| rng.sample(rand::distributions::Alphanumeric) as char)
         .collect();
     format!("bg_{}", random_part)
@@ -546,11 +545,8 @@ async fn monitor_task_timeout(task_id: String, timeout_ms: u64) {
                 let _ = tokio::time::timeout(Duration::from_secs(2), guard.child.wait()).await;
 
                 // Try to get exit code
-                match guard.child.try_wait() {
-                    Ok(Some(status)) => {
-                        guard.exit_code = status.code();
-                    }
-                    _ => {}
+                if let Ok(Some(status)) = guard.child.try_wait() {
+                    guard.exit_code = status.code();
                 }
             }
             break;
@@ -707,7 +703,7 @@ pub async fn kill_background_task(task_id: String) -> Result<bool, String> {
     // Get handle without removing from registry yet
     let handle = {
         let registry_guard = registry.lock().await;
-        registry_guard.get(&task_id).map(|h| h.clone())
+        registry_guard.get(&task_id).map(|h| Arc::clone(&h))
     };
 
     if let Some(handle) = handle {

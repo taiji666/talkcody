@@ -56,7 +56,7 @@ impl AgentsRepository {
             )
             .await?;
 
-        Ok(result.rows.first().map(|row| row_to_agent(row)))
+        Ok(result.rows.first().map(row_to_agent))
     }
 
     /// Get agent by name
@@ -69,7 +69,7 @@ impl AgentsRepository {
             )
             .await?;
 
-        Ok(result.rows.first().map(|row| row_to_agent(row)))
+        Ok(result.rows.first().map(row_to_agent))
     }
 
     /// List all agents
@@ -176,7 +176,7 @@ impl AgentsRepository {
             )
             .await?;
 
-        Ok(result.rows.first().map(|row| row_to_agent_session(row)))
+        Ok(result.rows.first().map(row_to_agent_session))
     }
 
     /// Get all sessions for an agent

@@ -18,7 +18,7 @@ if git diff --cached --name-only | grep -E '\.rs$' > /dev/null; then
 
   # Run cargo clippy to check for warnings (treat warnings as errors)
   echo "Running cargo clippy to check for warnings..."
-  cargo clippy -- -D warnings
+  cargo clippy --workspace -- -D warnings
   clippy_exit_code=$?
   cd ..
 

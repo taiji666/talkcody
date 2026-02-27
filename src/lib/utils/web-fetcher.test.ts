@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { taskFileService } from '@/services/task-file-service';
+import * as aliasedUtils from '@/lib/utils';
+import * as tauriFetch from '@/lib/tauri-fetch';
 import * as utils from '../utils';
 import { fetchWebContent, fetchWithTavily } from './web-fetcher';
 import * as readabilityExtractorModule from './readability-extractor';
@@ -9,14 +11,28 @@ vi.mock('../utils', () => ({
   fetchWithTimeout: vi.fn(),
 }));
 
-const mockFetchWithTimeout = utils.fetchWithTimeout as Mock;
-
-// Mock readability extractor
-vi.mock('./readability-extractor', () => ({
-  readabilityExtractor: {
-    extract: vi.fn(),
-  },
+vi.mock('@/lib/utils', () => ({
+  fetchWithTimeout: vi.fn(),
 }));
+
+vi.mock('@/lib/tauri-fetch', () => ({
+  simpleFetch: vi.fn(),
+}));
+
+const mockFetchWithTimeout = utils.fetchWithTimeout as Mock;
+const mockAliasedFetchWithTimeout = aliasedUtils.fetchWithTimeout as Mock;
+const mockSimpleFetch = tauriFetch.simpleFetch as Mock;
+
+// Mock readability extractor (keep class export for direct tests)
+vi.mock('./readability-extractor', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./readability-extractor')>();
+  return {
+    ...actual,
+    readabilityExtractor: {
+      extract: vi.fn(),
+    },
+  };
+});
 
 vi.mock('@/services/task-file-service', () => ({
   taskFileService: {
@@ -26,7 +42,6 @@ vi.mock('@/services/task-file-service', () => ({
 
 const mockReadabilityExtract = readabilityExtractorModule.readabilityExtractor.extract as Mock;
 
-// Set up environment variable for tests
 const originalEnv = import.meta.env;
 
 describe('web-fetcher', () => {
@@ -145,10 +160,11 @@ describe('web-fetcher', () => {
       expect(result.content).toBe('Test content');
       expect(mockReadabilityExtract).toHaveBeenCalledTimes(1);
       expect(mockFetchWithTimeout).not.toHaveBeenCalled();
+      expect(mockAliasedFetchWithTimeout).not.toHaveBeenCalled();
     });
 
     it('should save content to task file when content exceeds limit', async () => {
-      const longContent = 'a'.repeat(10001);
+      const longContent = 'a'.repeat(40001);
 
       mockReadabilityExtract.mockResolvedValueOnce({
         title: 'Test Page',
@@ -173,11 +189,11 @@ describe('web-fetcher', () => {
       expect(result.content).toContain('saved to');
       expect(result.content).toContain('grep');
       expect(result.truncated).toBe(true);
-      expect(result.contentLength).toBe(10001);
+      expect(result.contentLength).toBe(40001);
     });
 
     it('should truncate content when task context is missing', async () => {
-      const longContent = 'b'.repeat(10001);
+      const longContent = 'b'.repeat(40001);
 
       mockReadabilityExtract.mockResolvedValueOnce({
         title: 'Test Page',
@@ -188,9 +204,9 @@ describe('web-fetcher', () => {
       const result = await fetchWebContent('https://example.com');
 
       expect(result.truncated).toBe(true);
-      expect(result.contentLength).toBe(10001);
-      expect(result.content).toContain('Returning first 10000 characters');
-      expect(result.content).toContain(longContent.slice(0, 10000));
+      expect(result.contentLength).toBe(40001);
+      expect(result.content).toContain('Returning first 40000 characters');
+      expect(result.content).toContain(longContent.slice(0, 40000));
     });
 
     it('should fallback to Tavily when Readability returns null', async () => {
@@ -289,6 +305,94 @@ describe('web-fetcher', () => {
       });
 
       await expect(fetchWebContent('http://example.com')).resolves.toBeDefined();
+    });
+  });
+
+  describe('readability extractor (dynamic detection)', () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+      mockSimpleFetch.mockReset();
+      mockAliasedFetchWithTimeout.mockReset();
+    });
+
+    it('should use TalkCody API for CSR app shell pages', async () => {
+      mockAliasedFetchWithTimeout.mockImplementation(async (input: RequestInfo) => {
+        if (typeof input === 'string' && input.endsWith('.md')) {
+          return {
+            ok: false,
+            status: 404,
+            headers: {
+              get: () => 'text/plain',
+            },
+            text: vi.fn().mockResolvedValue(''),
+          } as unknown as Response;
+        }
+
+        return {
+          ok: true,
+          headers: {
+            get: () => 'text/html; charset=utf-8',
+          },
+          text: vi.fn().mockResolvedValue(
+            '<!doctype html><html><head><title>Feishu Doc</title>' +
+              '<script src="/static/runtime~app-123.js"></script>' +
+              '<script src="/static/vendors-456.js"></script>' +
+              '</head><body><div id="root"></div></body></html>'
+          ),
+        } as unknown as Response;
+      });
+
+      mockSimpleFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          content: '# Rendered Content\n\n' + 'x'.repeat(150),
+          url: 'https://open.feishu.cn/document/example',
+        }),
+      } as unknown as Response);
+
+      const { ReadabilityExtractor } = await import('./readability-extractor');
+      const extractor = new ReadabilityExtractor(10);
+      const result = await extractor.extract('https://open.feishu.cn/document/example');
+
+      expect(result?.content).toContain('Rendered Content');
+      expect(mockSimpleFetch).toHaveBeenCalled();
+    });
+
+    it('should prefer static HTML extraction for non-CSR pages', async () => {
+      mockAliasedFetchWithTimeout.mockImplementation(async (input: RequestInfo) => {
+        if (typeof input === 'string' && input.endsWith('.md')) {
+          return {
+            ok: false,
+            status: 404,
+            headers: {
+              get: () => 'text/plain',
+            },
+            text: vi.fn().mockResolvedValue(''),
+          } as unknown as Response;
+        }
+
+        return {
+          ok: true,
+          headers: {
+            get: () => 'text/html; charset=utf-8',
+          },
+          text: vi.fn().mockResolvedValue(
+            '<!doctype html><html><head><title>Static</title></head>' +
+              '<body><main><h1>Static Title</h1>' +
+              '<p>' +
+              'This static content is intentionally long to avoid dynamic detection.' +
+              ' It should exceed the minimal text thresholds used by the extractor.' +
+              '</p></main></body></html>'
+          ),
+        } as unknown as Response;
+      });
+
+      const { ReadabilityExtractor } = await import('./readability-extractor');
+      const extractor = new ReadabilityExtractor(10);
+      const result = await extractor.extract('https://example.com/static');
+
+      expect(result?.content).toContain('Static Title');
+      expect(mockSimpleFetch).not.toHaveBeenCalled();
     });
   });
 });

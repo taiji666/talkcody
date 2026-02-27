@@ -27,7 +27,7 @@ const DEFAULT_ERROR_BACKOFF_MS: u64 = 1500;
 const MAX_ERROR_BACKOFF_MS: u64 = 30000;
 const MAX_FEISHU_MEDIA_BYTES: u64 = 20 * 1024 * 1024;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeishuConfig {
     pub enabled: bool,
@@ -36,19 +36,6 @@ pub struct FeishuConfig {
     pub encrypt_key: String,
     pub verification_token: String,
     pub allowed_open_ids: Vec<String>,
-}
-
-impl Default for FeishuConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            app_id: String::new(),
-            app_secret: String::new(),
-            encrypt_key: String::new(),
-            verification_token: String::new(),
-            allowed_open_ids: Vec::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,7 +82,7 @@ pub struct FeishuEditMessageRequest {
     pub text: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FeishuGateway {
     config: FeishuConfig,
     running: bool,

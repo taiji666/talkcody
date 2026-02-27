@@ -23,7 +23,7 @@ fn create_window_from_dock(
             .clone();
 
         if let Err(e) = create_window(
-            &app_handle,
+            app_handle,
             &window_registry,
             project_id,
             root_path,

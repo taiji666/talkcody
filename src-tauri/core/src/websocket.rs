@@ -17,20 +17,21 @@ pub struct WebSocketMessage {
     pub data: String,
 }
 
+// Type alias for the complex WebSocket sender type
+type WebSocketSender = futures_util::stream::SplitSink<
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+    Message,
+>;
+
 // WebSocket connection state
 pub struct WebSocketState {
-    sender: Arc<
-        Mutex<
-            Option<
-                futures_util::stream::SplitSink<
-                    tokio_tungstenite::WebSocketStream<
-                        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-                    >,
-                    Message,
-                >,
-            >,
-        >,
-    >,
+    sender: Arc<Mutex<Option<WebSocketSender>>>,
+}
+
+impl Default for WebSocketState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WebSocketState {

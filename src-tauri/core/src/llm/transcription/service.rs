@@ -36,7 +36,7 @@ impl TranscriptionService {
         let api_map = api_keys
             .load_api_keys()
             .await
-            .map_err(|e| TranscriptionError::RequestFailed(e))?;
+            .map_err(TranscriptionError::RequestFailed)?;
 
         // Parse model identifier and get provider
         let (model_key, provider_id) = ModelRegistry::get_model_provider(
@@ -79,7 +79,7 @@ impl TranscriptionService {
                 client
                     .transcribe(api_keys, &provider_model_name, context)
                     .await
-                    .map_err(|e| TranscriptionError::RequestFailed(e))?
+                    .map_err(TranscriptionError::RequestFailed)?
             }
             TranscriptionProvider::OpenAI => {
                 let provider_config = registry
@@ -89,14 +89,14 @@ impl TranscriptionService {
                 client
                     .transcribe(api_keys, &provider_model_name, context)
                     .await
-                    .map_err(|e| TranscriptionError::RequestFailed(e))?
+                    .map_err(TranscriptionError::RequestFailed)?
             }
             TranscriptionProvider::Google => {
                 let client = GoogleTranscriptionClient::new();
                 client
                     .transcribe(api_keys, &provider_model_name, context)
                     .await
-                    .map_err(|e| TranscriptionError::RequestFailed(e))?
+                    .map_err(TranscriptionError::RequestFailed)?
             }
             TranscriptionProvider::Groq => {
                 let provider_config = registry
@@ -116,7 +116,7 @@ impl TranscriptionService {
                 let response = client
                     .transcribe(api_keys, groq_request)
                     .await
-                    .map_err(|e| TranscriptionError::RequestFailed(e))?;
+                    .map_err(TranscriptionError::RequestFailed)?;
                 TranscriptionResult {
                     text: response.text,
                     language: response.language,

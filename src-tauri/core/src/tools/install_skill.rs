@@ -48,7 +48,7 @@ pub async fn execute(
     let skill_id = skill_id.map(|s| s.to_string()).unwrap_or_else(|| {
         path.split('/')
             .filter(|s| !s.is_empty())
-            .last()
+            .next_back()
             .unwrap_or("unknown")
             .to_string()
     });

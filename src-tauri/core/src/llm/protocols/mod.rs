@@ -22,6 +22,7 @@ pub trait LlmProtocol: Send + Sync {
     fn endpoint_path(&self) -> &'static str;
 
     /// Legacy method
+    #[allow(clippy::too_many_arguments)]
     fn build_request(
         &self,
         model: &str,

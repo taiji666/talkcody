@@ -1,8 +1,8 @@
 use crate::llm::protocols::stream_parser::StreamParseState;
 use crate::llm::protocols::{
     self, request_builder::RequestBuildContext, stream_parser::StreamParseContext, LlmProtocol,
-    OpenAiReasoningPartStatus, OpenAiReasoningState, ProtocolRequestBuilder, ProtocolStreamParser,
-    ProtocolStreamState, ToolCallAccum,
+    OpenAiReasoningPartStatus, ProtocolRequestBuilder, ProtocolStreamParser, ProtocolStreamState,
+    ToolCallAccum,
 };
 use crate::llm::types::{ContentPart, Message, MessageContent, StreamEvent, ToolDefinition};
 use serde_json::{json, Value};
@@ -12,7 +12,7 @@ pub struct OpenAiResponsesProtocol;
 impl OpenAiResponsesProtocol {
     fn normalize_model(model_name: &str) -> String {
         let model_id = if model_name.contains('/') {
-            model_name.split('/').last().unwrap_or(model_name)
+            model_name.split('/').next_back().unwrap_or(model_name)
         } else {
             model_name
         };
@@ -396,7 +396,7 @@ pub(crate) fn parse_openai_oauth_event_legacy(
             }
         }
 
-        if let Some(event) = state.pending_events.get(0).cloned() {
+        if let Some(event) = state.pending_events.first().cloned() {
             state.pending_events.remove(0);
             return Ok(Some(event));
         }
@@ -518,10 +518,7 @@ pub(crate) fn parse_openai_oauth_event_legacy(
                             .get("encrypted_content")
                             .and_then(|v| v.as_str())
                             .map(|value| value.to_string());
-                        let active = state
-                            .openai_reasoning
-                            .entry(item_id.clone())
-                            .or_insert_with(OpenAiReasoningState::default);
+                        let active = state.openai_reasoning.entry(item_id.clone()).or_default();
                         if encrypted_content.is_some() {
                             active.encrypted_content = encrypted_content.clone();
                         }
@@ -667,10 +664,7 @@ pub(crate) fn parse_openai_oauth_event_legacy(
                 .and_then(|v| v.as_u64())
                 .unwrap_or(0);
 
-            let state_entry = state
-                .openai_reasoning
-                .entry(item_id.clone())
-                .or_insert_with(OpenAiReasoningState::default);
+            let state_entry = state.openai_reasoning.entry(item_id.clone()).or_default();
 
             state_entry
                 .summary_parts
@@ -844,10 +838,7 @@ pub(crate) fn parse_openai_oauth_event_legacy(
             let delta = payload.get("delta").and_then(|v| v.as_str()).unwrap_or("");
 
             // Get or create reasoning state
-            let state_entry = state
-                .openai_reasoning
-                .entry(item_id.clone())
-                .or_insert_with(OpenAiReasoningState::default);
+            let state_entry = state.openai_reasoning.entry(item_id.clone()).or_default();
 
             // Mark part 0 as active and check if this is the first start
             let first_start = state_entry
@@ -1032,7 +1023,7 @@ pub(crate) fn parse_openai_oauth_event_legacy(
         }
     }
 
-    if let Some(event) = state.pending_events.get(0).cloned() {
+    if let Some(event) = state.pending_events.first().cloned() {
         state.pending_events.remove(0);
         return Ok(Some(event));
     }

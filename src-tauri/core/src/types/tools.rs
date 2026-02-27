@@ -272,7 +272,7 @@ async fn execute_tool_by_name(
                 .await;
             ToolExecutionOutput {
                 success: platform_result.success,
-                data: serde_json::to_value(&platform_result.data).unwrap_or_default(),
+                data: serde_json::to_value(platform_result.data).unwrap_or_default(),
                 error: platform_result.error,
             }
         }
@@ -304,7 +304,7 @@ async fn execute_tool_by_name(
                             .await;
                         ToolExecutionOutput {
                             success: write_result.success,
-                            data: serde_json::to_value(&write_result.data).unwrap_or_default(),
+                            data: serde_json::to_value(write_result.data).unwrap_or_default(),
                             error: write_result.error,
                         }
                     } else {
@@ -341,11 +341,9 @@ async fn execute_tool_by_name(
                     .filter(|e| {
                         let name = e.file_name().to_string_lossy().to_string();
                         // Very simple pattern matching
-                        if pattern.starts_with("**/*.") {
-                            let ext = &pattern[4..]; // Get extension after "**/*."
+                        if let Some(ext) = pattern.strip_prefix("**/*.") {
                             name.ends_with(ext)
-                        } else if pattern.starts_with("*.") {
-                            let ext = &pattern[2..]; // Get extension after "*."
+                        } else if let Some(ext) = pattern.strip_prefix("*.") {
                             name.ends_with(ext)
                         } else {
                             name.contains(pattern)

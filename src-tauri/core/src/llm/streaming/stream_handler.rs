@@ -19,6 +19,9 @@ use tokio::time::timeout;
 static REQUEST_COUNTER: AtomicU32 = AtomicU32::new(1000);
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
+/// Token usage info: (input_tokens, output_tokens, total_tokens, cached_input_tokens, cache_creation_input_tokens)
+type TokenUsageInfo = (i32, i32, Option<i32>, Option<i32>, Option<i32>);
+
 pub struct StreamHandler {
     registry: ProviderRegistry,
     api_keys: ApiKeyManager,
@@ -92,7 +95,7 @@ impl StreamHandler {
 
         // Initialize tracing span if trace_context is provided
         let mut trace_span_id: Option<String> = None;
-        let mut trace_usage: Option<(i32, i32, Option<i32>, Option<i32>, Option<i32>)> = None;
+        let mut trace_usage: Option<TokenUsageInfo> = None;
         let mut trace_finish_reason: Option<String> = None;
         let mut trace_client_start_ms: Option<i64> = None;
         let mut trace_ttft_emitted = false;
@@ -862,7 +865,7 @@ impl StreamHandler {
     fn build_response_payload(
         finish_reason: Option<&str>,
         ttft_ms: Option<i64>,
-        trace_usage: Option<(i32, i32, Option<i32>, Option<i32>, Option<i32>)>,
+        trace_usage: Option<TokenUsageInfo>,
         response_text: &str,
     ) -> serde_json::Value {
         serde_json::json!({

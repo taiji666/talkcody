@@ -52,9 +52,6 @@ function getSerperApiKey(env?: HonoContext['Bindings']): string | undefined {
   return env?.SERPER_API_KEY;
 }
 
-/**
- * Call Serper API
- */
 async function callSerperApi(
   query: string,
   numResults: number,
@@ -84,9 +81,6 @@ async function callSerperApi(
   return (await response.json()) as SerperSearchResponse;
 }
 
-/**
- * Transform Serper results to WebSearchResult format
- */
 function transformSerperResults(serperResults: SerperSearchResult[]): WebSearchResult[] {
   return serperResults.map((result) => ({
     title: result.title,

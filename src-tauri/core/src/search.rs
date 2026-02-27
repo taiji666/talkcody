@@ -224,7 +224,7 @@ impl RipgrepSearch {
             let path = entry.path();
             let matcher_clone = Arc::clone(&matcher);
 
-            match self.search_in_file_fast(&*matcher_clone, path, max_matches_per_file, query) {
+            match self.search_in_file_fast(&matcher_clone, path, max_matches_per_file, query) {
                 Ok(Some(result)) => {
                     if !result.matches.is_empty() {
                         let mut results_guard = results.lock().unwrap();

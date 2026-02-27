@@ -37,8 +37,8 @@ pub struct CodeNavigationService {
     index: SymbolIndex,
 }
 
-impl CodeNavigationService {
-    pub fn new() -> Self {
+impl Default for CodeNavigationService {
+    fn default() -> Self {
         let mut service = Self {
             parsers: HashMap::new(),
             languages: HashMap::new(),
@@ -47,6 +47,12 @@ impl CodeNavigationService {
         };
         service.init_languages();
         service
+    }
+}
+
+impl CodeNavigationService {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     fn init_languages(&mut self) {

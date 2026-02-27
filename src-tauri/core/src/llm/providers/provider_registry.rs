@@ -120,6 +120,7 @@ impl<'a> LegacyProtocolAdapter<'a> {
     }
 
     #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     pub fn build_request(
         &self,
         model: &str,

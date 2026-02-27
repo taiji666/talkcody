@@ -476,7 +476,7 @@ impl ProtocolStreamParser for OpenAiProtocol {
                 }
                 state.reasoning_started = false;
             }
-            if let Some(event) = state.pending_events.get(0).cloned() {
+            if let Some(event) = state.pending_events.first().cloned() {
                 state.pending_events.remove(0);
                 return Ok(Some(event));
             }
@@ -580,7 +580,7 @@ impl ProtocolStreamParser for OpenAiProtocol {
             state.reasoning_started = false;
         }
 
-        if let Some(event) = state.pending_events.get(0).cloned() {
+        if let Some(event) = state.pending_events.first().cloned() {
             state.pending_events.remove(0);
             return Ok(Some(event));
         }
@@ -967,7 +967,7 @@ mod tests {
         {
             events.push(event);
         }
-        while let Some(pending) = state.pending_events.get(0).cloned() {
+        while let Some(pending) = state.pending_events.first().cloned() {
             state.pending_events.remove(0);
             events.push(pending);
         }
@@ -1051,7 +1051,7 @@ mod tests {
         {
             events.push(event);
         }
-        while let Some(pending) = state.pending_events.get(0).cloned() {
+        while let Some(pending) = state.pending_events.first().cloned() {
             state.pending_events.remove(0);
             events.push(pending);
         }
@@ -1270,7 +1270,7 @@ mod tests {
         if let Some(event) = parsed {
             events.push(event);
         }
-        while let Some(pending) = state.pending_events.get(0).cloned() {
+        while let Some(pending) = state.pending_events.first().cloned() {
             state.pending_events.remove(0);
             events.push(pending);
         }
@@ -1281,7 +1281,7 @@ mod tests {
         if let Some(event) = parsed {
             events.push(event);
         }
-        while let Some(pending) = state.pending_events.get(0).cloned() {
+        while let Some(pending) = state.pending_events.first().cloned() {
             state.pending_events.remove(0);
             events.push(pending);
         }
@@ -1293,7 +1293,7 @@ mod tests {
         if let Some(event) = parsed {
             events.push(event);
         }
-        while let Some(pending) = state.pending_events.get(0).cloned() {
+        while let Some(pending) = state.pending_events.first().cloned() {
             state.pending_events.remove(0);
             events.push(pending);
         }

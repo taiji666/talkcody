@@ -28,16 +28,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     supportsOAuth: true,
   },
 
-  moonshot: {
-    id: 'moonshot',
-    name: 'Moonshot',
-    apiKeyName: 'MOONSHOT_API_KEY',
-    required: false,
-    type: 'openai-compatible',
-    supportsInternational: true,
-    internationalBaseUrl: 'https://api.kimi.com/v1',
-  },
-
   kimi_coding: {
     id: 'kimi_coding',
     name: 'Kimi Coding Plan',
@@ -69,6 +59,17 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     codingPlanBaseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
   },
 
+  alibaba: {
+    id: 'alibaba',
+    name: 'Alibaba (DashScope)',
+    apiKeyName: 'ALIBABA_API_KEY',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    required: false,
+    type: 'openai-compatible',
+    supportsCodingPlan: true,
+    codingPlanBaseUrl: 'https://coding.dashscope.aliyuncs.com/v1',
+  },
+
   openRouter: {
     id: 'openRouter',
     name: 'OpenRouter',
@@ -94,12 +95,31 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     type: 'openai-compatible',
   },
 
+  moonshot: {
+    id: 'moonshot',
+    name: 'Moonshot',
+    apiKeyName: 'MOONSHOT_API_KEY',
+    required: false,
+    type: 'openai-compatible',
+    supportsInternational: true,
+    internationalBaseUrl: 'https://api.kimi.com/v1',
+  },
+
   google: {
     id: 'google',
     name: 'Google AI',
     apiKeyName: 'GOOGLE_API_KEY',
     required: false,
     type: 'custom',
+  },
+
+  volcengine: {
+    id: 'volcengine',
+    name: 'Volcengine (ByteDance)',
+    apiKeyName: 'VOLCENGINE_API_KEY',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    required: false,
+    type: 'openai-compatible',
   },
 
   zai: {
@@ -172,24 +192,6 @@ export const PROVIDER_CONFIGS: ProviderRegistry = {
     name: 'Groq',
     apiKeyName: 'GROQ_API_KEY',
     baseUrl: 'https://api.groq.com/openai/v1',
-    required: false,
-    type: 'openai-compatible',
-  },
-
-  volcengine: {
-    id: 'volcengine',
-    name: 'Volcengine (ByteDance)',
-    apiKeyName: 'VOLCENGINE_API_KEY',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    required: false,
-    type: 'openai-compatible',
-  },
-
-  alibaba: {
-    id: 'alibaba',
-    name: 'Alibaba (DashScope)',
-    apiKeyName: 'ALIBABA_API_KEY',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     required: false,
     type: 'openai-compatible',
   },

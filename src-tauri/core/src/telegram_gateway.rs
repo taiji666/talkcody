@@ -104,6 +104,12 @@ pub struct TelegramGateway {
     backoff_ms: u64,
 }
 
+impl Default for TelegramGateway {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TelegramGateway {
     pub fn new() -> Self {
         Self {
@@ -1013,7 +1019,7 @@ pub async fn start_gateway(
         .await
         .unwrap_or(TelegramGatewayStateSnapshot {
             version: TELEGRAM_STATE_VERSION,
-            last_update_id: last_update_id,
+            last_update_id,
         });
 
     {

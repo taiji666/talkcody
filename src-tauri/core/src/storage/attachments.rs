@@ -82,7 +82,7 @@ impl AttachmentsRepository {
             )
             .await?;
 
-        Ok(result.rows.first().map(|row| row_to_attachment(row)))
+        Ok(result.rows.first().map(row_to_attachment))
     }
 
     /// Read attachment file data

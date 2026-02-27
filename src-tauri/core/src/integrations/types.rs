@@ -116,8 +116,8 @@ impl IntegrationManager {
     }
 
     /// Get an adapter by ID
-    pub fn get_adapter(&self, id: &str) -> Option<&Box<dyn IntegrationAdapter>> {
-        self.adapters.get(id)
+    pub fn get_adapter(&self, id: &str) -> Option<&dyn IntegrationAdapter> {
+        self.adapters.get(id).map(|b| b.as_ref())
     }
 
     /// Start all adapters

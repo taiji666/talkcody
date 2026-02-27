@@ -16,13 +16,8 @@ pub struct GlobResult {
     pub modified_time: u64,
 }
 
+#[derive(Default)]
 pub struct HighPerformanceGlob {}
-
-impl Default for HighPerformanceGlob {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 impl HighPerformanceGlob {
     pub fn new() -> Self {
@@ -196,7 +191,7 @@ impl HighPerformanceGlob {
             .trim_start_matches('\\');
 
         // Try matching suffix against the file name
-        if let Some(file_name) = after_prefix.split('/').last() {
+        if let Some(file_name) = after_prefix.split('/').next_back() {
             if self.simple_glob_match(file_name, suffix) {
                 return true;
             }

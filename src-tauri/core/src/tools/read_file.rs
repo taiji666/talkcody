@@ -186,18 +186,16 @@ fn extract_lines(
                 start_line_number, end_line_number, file_path
             )
         }
+    } else if actual_lines_read < total_lines {
+        format!(
+            "Successfully read first {} lines from file: {} (TRUNCATED: limited to {} lines, file has {} total lines)",
+            actual_lines_read, file_path, MAX_LINES, total_lines
+        )
     } else {
-        if actual_lines_read < total_lines {
-            format!(
-                "Successfully read first {} lines from file: {} (TRUNCATED: limited to {} lines, file has {} total lines)",
-                actual_lines_read, file_path, MAX_LINES, total_lines
-            )
-        } else {
-            format!(
-                "Successfully read first {} lines from file: {}",
-                actual_lines_read, file_path
-            )
-        }
+        format!(
+            "Successfully read first {} lines from file: {}",
+            actual_lines_read, file_path
+        )
     };
 
     LineExtractionResult {

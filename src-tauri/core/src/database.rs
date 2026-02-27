@@ -77,7 +77,7 @@ impl Database {
 
             // Convert JSON values to libsql Values
             let libsql_params: Vec<libsql::Value> =
-                params.iter().map(|v| json_to_libsql_value(v)).collect();
+                params.iter().map(json_to_libsql_value).collect();
 
             // Check if this is a SELECT query - if so, use query() instead
             let sql_trimmed = sql.trim_start().to_uppercase();
@@ -185,8 +185,7 @@ impl Database {
         let conn = lock.as_ref().ok_or("Database not connected")?;
 
         // Convert JSON values to libsql Values
-        let libsql_params: Vec<libsql::Value> =
-            params.iter().map(|v| json_to_libsql_value(v)).collect();
+        let libsql_params: Vec<libsql::Value> = params.iter().map(json_to_libsql_value).collect();
 
         let stmt = conn
             .prepare(sql)

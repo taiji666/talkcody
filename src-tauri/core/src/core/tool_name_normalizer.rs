@@ -42,7 +42,7 @@ pub fn normalize_tool_name(name: &str) -> String {
     }
 
     // If already canonical, keep as-is to preserve casing.
-    if CANONICAL_TOOL_NAMES.iter().any(|tool| *tool == trimmed) {
+    if CANONICAL_TOOL_NAMES.contains(&trimmed) {
         return trimmed.to_string();
     }
 

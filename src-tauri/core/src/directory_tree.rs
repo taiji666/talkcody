@@ -29,12 +29,18 @@ pub struct DirectoryTreeBuilder {
     cache_ttl: u64, // Cache TTL in seconds
 }
 
-impl DirectoryTreeBuilder {
-    pub fn new() -> Self {
+impl Default for DirectoryTreeBuilder {
+    fn default() -> Self {
         Self {
             cache: Arc::new(Mutex::new(HashMap::new())),
             cache_ttl: 30, // 30 seconds cache
         }
+    }
+}
+
+impl DirectoryTreeBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     fn get_current_timestamp() -> u64 {
@@ -100,7 +106,7 @@ impl DirectoryTreeBuilder {
         let gitignore = Self::build_gitignore_matcher(root);
 
         // Build tree with immediate depth loading
-        let node = self.build_node_recursive(root, 0, max_immediate_depth, now, &gitignore)?;
+        let node = Self::build_node_recursive(root, 0, max_immediate_depth, &gitignore)?;
 
         // Cache the result
         if let Ok(mut cache) = self.cache.lock() {
@@ -117,11 +123,9 @@ impl DirectoryTreeBuilder {
     }
 
     fn build_node_recursive(
-        &self,
         path: &Path,
         current_depth: usize,
         max_depth: usize,
-        timestamp: u64,
         gitignore: &Option<Gitignore>,
     ) -> Result<FileNode, String> {
         let name = path
@@ -131,6 +135,7 @@ impl DirectoryTreeBuilder {
             .to_string();
 
         let path_str = Self::normalize_path(path);
+        let timestamp = Self::get_current_timestamp();
         let (modified_time, size) = Self::get_file_metadata(path).unwrap_or((timestamp, 0));
 
         // Check if this path is git-ignored
@@ -155,15 +160,7 @@ impl DirectoryTreeBuilder {
 
         // Handle directory
         let entries = match std::fs::read_dir(path) {
-            Ok(entries) => {
-                let mut items = Vec::new();
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        items.push(entry);
-                    }
-                }
-                items
-            }
+            Ok(entries) => entries.flatten().collect::<Vec<_>>(),
             Err(_) => {
                 return Err(format!("Failed to read directory: {}", path_str));
             }
@@ -200,15 +197,10 @@ impl DirectoryTreeBuilder {
                 continue;
             }
 
-            match self.build_node_recursive(
-                &entry_path,
-                current_depth + 1,
-                max_depth,
-                timestamp,
-                gitignore,
-            ) {
-                Ok(child) => children.push(child),
-                Err(_) => {} // Skip failed entries
+            if let Ok(child) =
+                Self::build_node_recursive(&entry_path, current_depth + 1, max_depth, gitignore)
+            {
+                children.push(child);
             }
         }
 
@@ -268,20 +260,11 @@ impl DirectoryTreeBuilder {
         }
 
         // Build gitignore matcher from git root
-        let gitignore =
-            Self::find_git_root(path).and_then(|root| Self::build_gitignore_matcher(root));
+        let gitignore = Self::find_git_root(path).and_then(Self::build_gitignore_matcher);
 
         // Build children
         let entries = match std::fs::read_dir(path) {
-            Ok(entries) => {
-                let mut items = Vec::new();
-                for entry in entries {
-                    if let Ok(entry) = entry {
-                        items.push(entry);
-                    }
-                }
-                items
-            }
+            Ok(entries) => entries.flatten().collect::<Vec<_>>(),
             Err(_) => {
                 return Err("Failed to read directory".to_string());
             }
@@ -298,9 +281,8 @@ impl DirectoryTreeBuilder {
                 continue;
             }
 
-            match self.build_node_recursive(&entry_path, 1, 2, now, &gitignore) {
-                Ok(child) => children.push(child),
-                Err(_) => {} // Skip failed entries
+            if let Ok(child) = Self::build_node_recursive(&entry_path, 1, 2, &gitignore) {
+                children.push(child);
             }
         }
 

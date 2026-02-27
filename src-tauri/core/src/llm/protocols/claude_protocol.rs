@@ -267,7 +267,7 @@ impl LlmProtocol for ClaudeProtocol {
                                     .to_string();
                                 let input = block.get("input").cloned().unwrap_or(json!({}));
                                 let arguments = if input.is_object()
-                                    && input.as_object().map_or(false, |obj| obj.is_empty())
+                                    && input.as_object().is_some_and(|obj| obj.is_empty())
                                 {
                                     String::new()
                                 } else {

@@ -119,14 +119,15 @@ fn decode_basic_html_entities(input: &str) -> String {
         .replace("&nbsp;", " ")
         .replace("&#34;", "\"")
         .replace("&apos;", "'")
-        .replace("<", "<")
-        .replace(">", ">")
-        .replace("&", "&")
 }
 
 fn extract_text_from_html(html: &str) -> String {
     let mut text = html.to_string();
-    if let Ok(re) = Regex::new(r"(?is)<(script|style)[^>]*>.*?</\1>") {
+    // Remove script and style tags (using separate patterns since backreferences are not supported)
+    if let Ok(re) = Regex::new(r"(?is)<script[^>]*>.*?</script>") {
+        text = re.replace_all(&text, " ").into_owned();
+    }
+    if let Ok(re) = Regex::new(r"(?is)<style[^>]*>.*?</style>") {
         text = re.replace_all(&text, " ").into_owned();
     }
     if let Ok(re) = Regex::new(r"(?i)<br\s*/?>") {

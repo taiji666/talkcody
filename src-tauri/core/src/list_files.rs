@@ -50,43 +50,40 @@ pub fn list_project_files(
                 return WalkState::Quit;
             }
 
-            match result {
-                Ok(entry) => {
-                    // Skip root itself
-                    if entry.depth() == 0 {
-                        return WalkState::Continue;
-                    }
+            if let Ok(entry) = result {
+                // Skip root itself
+                if entry.depth() == 0 {
+                    return WalkState::Continue;
+                }
 
-                    let path = entry.path().to_path_buf();
-                    let file_type = match entry.file_type() {
-                        Some(ft) => ft,
-                        None => return WalkState::Continue,
-                    };
-                    let is_dir = file_type.is_dir();
+                let path = entry.path().to_path_buf();
+                let file_type = match entry.file_type() {
+                    Some(ft) => ft,
+                    None => return WalkState::Continue,
+                };
+                let is_dir = file_type.is_dir();
 
-                    // Filter binary files
-                    if !is_dir {
-                        if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-                            if is_binary_extension(ext) {
-                                return WalkState::Continue;
-                            }
+                // Filter binary files
+                if !is_dir {
+                    if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                        if is_binary_extension(ext) {
+                            return WalkState::Continue;
                         }
                     }
-
-                    // Compute group key (parent relative path)
-                    let rel = match path.strip_prefix(&root_clone) {
-                        Ok(p) => p,
-                        Err(_) => path.as_path(),
-                    };
-                    let parent = rel.parent().unwrap_or(Path::new(""));
-                    let group_key = normalize_seps(parent);
-                    let name = entry.file_name().to_string_lossy().to_string();
-
-                    // Increment counter and send tuple to collector
-                    count.fetch_add(1, Ordering::Relaxed);
-                    let _ = tx.send((group_key, name, is_dir));
                 }
-                Err(_) => {}
+
+                // Compute group key (parent relative path)
+                let rel = match path.strip_prefix(&root_clone) {
+                    Ok(p) => p,
+                    Err(_) => path.as_path(),
+                };
+                let parent = rel.parent().unwrap_or(Path::new(""));
+                let group_key = normalize_seps(parent);
+                let name = entry.file_name().to_string_lossy().to_string();
+
+                // Increment counter and send tuple to collector
+                count.fetch_add(1, Ordering::Relaxed);
+                let _ = tx.send((group_key, name, is_dir));
             }
             WalkState::Continue
         })

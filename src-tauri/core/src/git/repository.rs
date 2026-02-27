@@ -2,6 +2,10 @@ use super::types::BranchInfo;
 use git2::{Error as GitError, Repository};
 use std::path::Path;
 
+/// Type alias for upstream branch information tuple
+/// (upstream_name, ahead_count, behind_count)
+pub type UpstreamInfo = (Option<String>, Option<usize>, Option<usize>);
+
 /// Discovers a Git repository starting from the given path
 /// This will search upward from the given path until a .git directory is found
 pub fn discover_repository<P: AsRef<Path>>(path: P) -> Result<Repository, GitError> {
@@ -52,7 +56,7 @@ pub fn get_current_branch(repo: &Repository) -> Result<BranchInfo, GitError> {
 fn get_upstream_info(
     repo: &Repository,
     reference: &git2::Reference,
-) -> Result<(Option<String>, Option<usize>, Option<usize>), GitError> {
+) -> Result<UpstreamInfo, GitError> {
     // Try to get branch name to find upstream
     let branch_name = match reference.shorthand() {
         Some(name) => name,

@@ -472,7 +472,7 @@ impl ApiKeyManager {
                 tokens.insert("anthropic".to_string(), token);
             }
         }
-        if let Some(token) = self.get_valid_github_copilot_token().await.ok() {
+        if let Ok(token) = self.get_valid_github_copilot_token().await {
             if !token.trim().is_empty() {
                 tokens.insert("github_copilot".to_string(), token);
             }

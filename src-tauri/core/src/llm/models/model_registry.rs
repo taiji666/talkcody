@@ -108,25 +108,17 @@ impl ModelRegistry {
                 if Self::provider_available(provider_id, api_keys, registry, custom_providers) {
                     if let Some(provider) = registry.provider(provider_id) {
                         let key = format!("{}-{}", model_key, provider_id);
-                        if !model_map.contains_key(&key) {
-                            model_map.insert(
-                                key,
-                                AvailableModel {
-                                    key: model_key.clone(),
-                                    name: model_cfg.name.clone(),
-                                    provider: provider_id.clone(),
-                                    provider_name: provider.name.clone(),
-                                    image_input: model_cfg.image_input,
-                                    image_output: model_cfg.image_output,
-                                    audio_input: model_cfg.audio_input,
-                                    video_input: model_cfg.video_input,
-                                    input_pricing: model_cfg
-                                        .pricing
-                                        .as_ref()
-                                        .map(|p| p.input.clone()),
-                                },
-                            );
-                        }
+                        model_map.entry(key).or_insert(AvailableModel {
+                            key: model_key.clone(),
+                            name: model_cfg.name.clone(),
+                            provider: provider_id.clone(),
+                            provider_name: provider.name.clone(),
+                            image_input: model_cfg.image_input,
+                            image_output: model_cfg.image_output,
+                            audio_input: model_cfg.audio_input,
+                            video_input: model_cfg.video_input,
+                            input_pricing: model_cfg.pricing.as_ref().map(|p| p.input.clone()),
+                        });
                     }
                 }
             }
@@ -138,25 +130,17 @@ impl ModelRegistry {
                 if let Some(custom) = custom_providers.providers.get(provider_id) {
                     if custom.enabled && !custom.api_key.trim().is_empty() {
                         let key = format!("{}-{}", model_key, provider_id);
-                        if !model_map.contains_key(&key) {
-                            model_map.insert(
-                                key,
-                                AvailableModel {
-                                    key: model_key.clone(),
-                                    name: model_cfg.name.clone(),
-                                    provider: provider_id.clone(),
-                                    provider_name: custom.name.clone(),
-                                    image_input: model_cfg.image_input,
-                                    image_output: model_cfg.image_output,
-                                    audio_input: model_cfg.audio_input,
-                                    video_input: model_cfg.video_input,
-                                    input_pricing: model_cfg
-                                        .pricing
-                                        .as_ref()
-                                        .map(|p| p.input.clone()),
-                                },
-                            );
-                        }
+                        model_map.entry(key).or_insert(AvailableModel {
+                            key: model_key.clone(),
+                            name: model_cfg.name.clone(),
+                            provider: provider_id.clone(),
+                            provider_name: custom.name.clone(),
+                            image_input: model_cfg.image_input,
+                            image_output: model_cfg.image_output,
+                            audio_input: model_cfg.audio_input,
+                            video_input: model_cfg.video_input,
+                            input_pricing: model_cfg.pricing.as_ref().map(|p| p.input.clone()),
+                        });
                     }
                 }
             }

@@ -26,6 +26,12 @@ pub struct WindowRegistry {
     windows: Arc<Mutex<HashMap<String, WindowState>>>,
 }
 
+impl Default for WindowRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WindowRegistry {
     pub fn new() -> Self {
         Self {

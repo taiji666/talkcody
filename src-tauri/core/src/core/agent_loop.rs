@@ -92,38 +92,21 @@ impl AgentLoop {
     /// Run the agent loop with full LLM integration
     pub async fn run(&self, ctx: &AgentLoopContext) -> Result<AgentLoopResult, String> {
         let messages = ctx.messages.clone();
-        let iteration = 0;
 
-        while iteration < self.config.max_iterations {
-            let _ = iteration + 1;
-
-            // Run a single iteration
-            match self.run_iteration(ctx, &messages).await? {
-                AgentLoopResult::Completed { message } => {
-                    return Ok(AgentLoopResult::Completed { message });
-                }
-                AgentLoopResult::ToolCalls { .. } => {
-                    return Ok(AgentLoopResult::MaxIterationsReached);
-                }
-                AgentLoopResult::WaitingForApproval { request } => {
-                    return Ok(AgentLoopResult::WaitingForApproval { request });
-                }
-                AgentLoopResult::WaitingForToolResult { tool_call_id } => {
-                    return Ok(AgentLoopResult::WaitingForToolResult { tool_call_id });
-                }
-                AgentLoopResult::Error { message } => {
-                    return Ok(AgentLoopResult::Error { message });
-                }
-                AgentLoopResult::MaxIterationsReached => {
-                    return Ok(AgentLoopResult::MaxIterationsReached);
-                }
-                AgentLoopResult::Cancelled => {
-                    return Ok(AgentLoopResult::Cancelled);
-                }
+        // Run a single iteration
+        match self.run_iteration(ctx, &messages).await? {
+            AgentLoopResult::Completed { message } => Ok(AgentLoopResult::Completed { message }),
+            AgentLoopResult::ToolCalls { .. } => Ok(AgentLoopResult::MaxIterationsReached),
+            AgentLoopResult::WaitingForApproval { request } => {
+                Ok(AgentLoopResult::WaitingForApproval { request })
             }
+            AgentLoopResult::WaitingForToolResult { tool_call_id } => {
+                Ok(AgentLoopResult::WaitingForToolResult { tool_call_id })
+            }
+            AgentLoopResult::Error { message } => Ok(AgentLoopResult::Error { message }),
+            AgentLoopResult::MaxIterationsReached => Ok(AgentLoopResult::MaxIterationsReached),
+            AgentLoopResult::Cancelled => Ok(AgentLoopResult::Cancelled),
         }
-
-        Ok(AgentLoopResult::MaxIterationsReached)
     }
 
     /// Run a single iteration with LLM streaming

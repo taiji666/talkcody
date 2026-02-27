@@ -150,7 +150,7 @@ impl Recorder {
 }
 
 fn recorded_fixture_path(config: &TestConfig, fixture: &ProviderFixture, channel: &str) -> PathBuf {
-    let model = fixture.model.replace('/', "_").replace(' ', "_");
+    let model = fixture.model.replace(['/', ' '], "_");
     let file_name = format!(
         "{}__{}__{}__{}.json",
         fixture.provider_id, fixture.protocol, model, channel
