@@ -1,5 +1,3 @@
-// Changelog data service for What's New dialog
-
 export type ChangelogItem =
   | string
   | {
@@ -28,25 +26,23 @@ export interface ChangelogEntry {
 // Only include the most recent versions that users care about
 export const CHANGELOG_DATA: ChangelogEntry[] = [
   {
-    version: '0.4.3',
-    date: '2026-02-20',
+    version: '0.4.4',
+    date: '2026-02-26',
     en: {
       added: [
-        'New Claude Opus 4.6 Model: Added Claude Opus 4.6 model support.',
-        'New GPT-5.3 Codex Spark Model: Added GPT-5.3 Codex Spark model support.',
-        'New Gemini 3.1 Pro Model: Added Gemini 3.1 Pro model support.',
-        'All new coding models are available via hot update immediately.',
+        'Aliyun Coding Plan Support: Aliyun Coding Plan supports Qwen 3.5 Plus, GLM-5, Kimi K2.5, and Minimax 2.5 models.',
+        'New Nano Banana 2 Model: Added Nano Banana 2 model support.',
+        'New GPT-5.3-Codex API Model: Added GPT-5.3-Codex API model support.',
       ],
-      fixed: ['Fixed UI layout bug when opening files on the homepage.'],
+      changed: ['Major web-fetch tool optimization.'],
     },
     zh: {
       added: [
-        '新增 Claude Opus 4.6 模型。',
-        '新增 GPT-5.3 Codex Spark 模型。',
-        '新增 Gemini 3.1 Pro 模型。',
-        '以上模型都第一时间热更新，之后的新 Coding 模型也都会第一时间热更新。',
+        '阿里云 Coding Plan 支持：阿里云 Coding Plan 支持 Qwen 3.5 Plus，GLM-5, Kimi K2.5, Minimax 2.5 模型。',
+        '新增 Nano Banana 2 模型。',
+        '新增 GPT-5.3-Codex API 模型。',
       ],
-      fixed: ['修复主页打开文件时 UI 布局的 bug。'],
+      changed: ['大幅优化 web-fetch tool。'],
     },
   },
 ];
